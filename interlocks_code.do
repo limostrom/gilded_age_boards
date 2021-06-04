@@ -10,10 +10,62 @@ clear all
 cap log close
 pause on
 
-cap cd "C:/Users/lmostrom/Documents/PersonalResearch"
+cap cd "C:/Users/lmostrom/Documents/Gilded Age Boards - Scratch"
 
+*%%Prep Underwriter Dataset%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+cap cd  "/Users/laurenmostrom/Dropbox/Mostrom_Thesis_2018/Post-Thesis" // old computer
+cd "C:\Users\lmostrom\Documents\Gilded Age Boards - Scratch\"
+
+use fullname_m year_std using "Thesis/Merges/UW_1880-1920_top10.dta", clear
+duplicates drop
+tempfile top10
+save `top10', replace
+
+use year_std fullname_m using "Data/UW_1880-1920_Indtop10.dta", clear
+duplicates drop
+tempfile indtop10
+save `indtop10', replace
+
+*%% Code Railroad Interlocks %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+use cname fullname_m director year_std using "Thesis/Merges/RR_boards_wtitles.dta", clear
+include "../GitHub/gilded_age_boards/assign_regions.do"
+keep if director
+drop director
+
+ren cname cnameB
+ren region regionB
+tempfile self
+save `self', replace
+
+ren cnameB cnameA
+ren regionB regionA
+
+joinby fullname_m year_std using `self'
+
+merge m:1 fullname_m year_std using `top10', keep(1 3)
+gen banker = _merge == 3
+drop _merge
+
+gen interlock = cnameA != cnameB
+	replace banker = 0 if interlock == 0
+gen same_reg = regionA == regionB
+gen oth_reg = regionA != regionB
+		*sort cnameA cnameB fullname_m
+		*br fullname_m interlock banker cnameB cnameA year_std ///
+			if year_std == 1905 
+			*& cnameA == "Cleve Cincin Chic & St Louis"
+		*pause
+duplicates drop
+drop fullname_m
+
+bys cnameA cnameB year_std: egen n_totints = total(interlock)
+bys cnameA cnameB year_std: egen n_bnkints = total(banker)
+bys cnameA cnameB year_std: ereplace banker = max(banker)
+duplicates drop
+
+save "Data/rr_interlocks_coded.dta", replace
+	sdf
 *%% Prep Industry Datasets %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
 forval y = 1895(5)1920 {
     import excel cname cid Entrant Industry using "industrials_interlocks_coded.xlsx", ///
 		clear sheet("`y'") cellrange(A2)
@@ -33,51 +85,6 @@ drop if cname == ""
 
 tempfile industries
 save `industries', replace
-
-*%%Prep Underwriter Dataset%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-cap cd  "/Users/laurenmostrom/Dropbox/Mostrom_Thesis_2018/Post-Thesis" // old computer
-cd "C:\Users\lmostrom\Documents\PersonalResearch\"
-
-use fullname_m year_std using "Thesis/Merges/UW_1880-1920_top10.dta", clear
-duplicates drop
-tempfile top10
-save `top10', replace
-
-use year_std fullname_m using "Gilded Age Boards/UW_1880-1920_Indtop10.dta", clear
-duplicates drop
-tempfile indtop10
-save `indtop10', replace
-
-*%% Code Railroad Interlocks %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-use cname fullname_m year_std using "RR_1880-1920_clean.dta", clear
-include "Gilded Age Boards/assign_regions.do"
-
-ren cname cnameB
-ren region regionB
-tempfile self
-save `self', replace
-
-ren cnameB cnameA
-ren regionB regionA
-
-joinby fullname_m year_std using `self'
-
-merge m:1 fullname_m year_std using `top10', keep(1 3)
-gen banker = _merge == 3
-drop _merge
-
-gen interlock = cnameA != cnameB
-gen same_reg = regionA == regionB
-gen oth_reg = regionA != regionB
-drop fullname_m
-
-bys cnameA cnameB year_std: egen n_totints = total(interlock)
-bys cnameA cnameB year_std: egen n_bnkints = total(banker)
-bys cnameA cnameB year_std: ereplace banker = max(banker)
-duplicates drop
-
-save "Gilded Age Boards/rr_interlocks_coded.dta", replace
-	
 *%%Load Industrials Dataset%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 cap cd  "/Users/laurenmostrom/Dropbox/Mostrom_Thesis_2018/Post-Thesis" // old computer
 cd "C:\Users\lmostrom\Documents\PersonalResearch\"

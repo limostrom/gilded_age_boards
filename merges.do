@@ -9,7 +9,7 @@ pause on
 set more off
 
 cap cd  "/Users/laurenmostrom/Dropbox/Mostrom_Thesis_2018/Merges"
-cap cd "C:/Users/lmostrom/Documents/PersonalResearch/Thesis/Merges"
+cap cd "C:/Users/lmostrom/Documents/Gilded Age Boards/Thesis/Merges"
 
 #delimit ;
 
@@ -1186,7 +1186,7 @@ replace fullname_m = fullname if fullname_m == "";
 save "UW_1880-1920_JayCooke.dta", replace;
 */
 /*
-use Underwriters, clear;
+use Thesis/Merges/Underwriters, clear;
 keep if inlist(year, 1900, 1905, 1906, 1910, 1911, 1915, 1920);
 keep if inlist(cname, "Blair & Co", "Blair & Co Inc",
 					"First National",
@@ -1201,7 +1201,7 @@ keep if inlist(cname, "Blair & Co", "Blair & Co Inc",
 		inlist(cname, "Fisk Harvey & Sons",
 					"Clark Dodge & Co",
 					"Seligman J & W & Co");
-append using "../Underwriters_LM/Underwriters_pre-1900_top10_plus_early.dta";
+append using "Thesis/Underwriters_LM/Underwriters_pre-1900_top10_plus_early.dta";
 gen year_std = year;
 replace year_std = 1905 if year == 1906;
 replace year_std = 1910 if year == 1911;
@@ -1209,7 +1209,7 @@ replace year_std = 1910 if year == 1911;
 replace fullname_m = fullname_d if fullname_m == "";
 replace fullname_m = fullname if fullname_m == "";
 
-save "UW_1880-1920_top10_plus_early.dta", replace;
+save "Data/UW_1880-1920_top10_plus_early.dta", replace;
 */
 /*
 use Underwriters, clear;
@@ -1290,18 +1290,17 @@ cap drop _merge;
 ************** MERGING IN UNDERWRITERS *****************************************;
 ********************************************************************************;
 
-
 *Merging in underwriters;
-local num = "top10";
-use "Ind_boards_final.dta", clear;
-append using "Util_boards_final.dta";
+local num = "top10_plus_early";
+use "Thesis/Merges/Ind_boards_wtitles.dta", clear;
+append using "Thesis/Merges/Util_boards_final.dta";
 
-merge m:m fullname_m year_std using "../../Gilded Age Boards/UW_1880-1920_Ind`num'.dta", keep(1 3);
+merge m:m fullname_m year_std using "Data/UW_1880-1920_`num'.dta", keep(1 3) gen(_mUW);
 *merge m:m fullname_m year_std using "UW_1880-1920_1880cohort.dta", keep(1 3);
 
 
-gen uw = _merge == 3;
-gen nuw = _merge == 1;
+gen uw = _mUW == 3;
+gen nuw = _mUW == 1;
 
 replace sector = "Ind" if sector == "Util";
 
@@ -1319,15 +1318,14 @@ scatter Puw year_std;
 sort year_std sector;
 outsheet Puw year_std sector using all_Puw_`num'_Inds.csv, comma replace;
 *---------------------------------;
-local num = "top10";
-use "RR_boards_final.dta", clear;
+use "Thesis/Merges/RR_boards_wtitles.dta", clear;
 
-merge m:m fullname_m year_std using "UW_1880-1920_`num'.dta", keep(1 3);
+merge m:m fullname_m year_std using "Data/UW_1880-1920_`num'.dta", keep(1 3) gen(_mUW);
 *merge m:m fullname_m year_std using "UW_1880-1920_1880cohort.dta", keep(1 3);
 
 
-gen uw = _merge == 3;
-gen nuw = _merge == 1;
+gen uw = _mUW == 3;
+gen nuw = _mUW == 1;
 
 replace sector = "Ind" if sector == "Util";
 
@@ -1344,6 +1342,33 @@ scatter Puw year_std;
 
 sort year_std sector;
 outsheet Puw year_std sector using all_Puw_`num'_RRs.csv, comma replace;
+*---------------------------------;
+use "Thesis/Merges/RR_boards_wtitles.dta", clear;
+append using "Thesis/Merges/Ind_boards_wtitles.dta";
+append using "Thesis/Merges/Util_boards_final.dta";
+
+merge m:m fullname_m year_std using "Data/UW_1880-1920_`num'.dta", keep(1 3) gen(_mUW);
+*merge m:m fullname_m year_std using "UW_1880-1920_1880cohort.dta", keep(1 3);
+
+
+gen uw = _mUW == 3;
+gen nuw = _mUW == 1;
+
+replace sector = "Ind" if sector == "Util";
+
+collapse (sum) nuw uw, by(cname year_std sector);
+
+gen Puw = uw > 0;
+
+sort year_std sector cname;
+by year_std sector: summ Puw;
+
+*tab cohort;
+collapse (mean) Puw, by(year_std sector);
+scatter Puw year_std;
+
+sort year_std sector;
+outsheet Puw year_std sector using all_Puw_`num'_bysector.csv, comma replace;
 */
 /*
 * Utilities Merges;

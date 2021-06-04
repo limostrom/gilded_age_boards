@@ -6,7 +6,7 @@ clear all
 cap log close
 pause on
 
-cap cd "C:\Users\lmostrom\Documents\PersonalResearch\"
+cap cd "C:\Users\lmostrom\Documents\Gilded Age Boards - Scratch\"
 
 *%% Prep Number of Directors Variable %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -21,7 +21,7 @@ save `nd', replace
 
 *%%Prep Underwriter Dataset%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 cap cd  "/Users/laurenmostrom/Dropbox/Mostrom_Thesis_2018/Post-Thesis" // old computer
-cd "C:\Users\lmostrom\Documents\PersonalResearch\"
+cap cd "C:\Users\lmostrom\Documents\Gilded Age Boards - Scratch\"
 
 use "Thesis/Merges/UW_1880-1920_top10.dta", clear
 
@@ -31,28 +31,39 @@ rename cname bankname
 
 tempfile temp_uw
 save `temp_uw', replace
+
+*%%Prep Standardized RR Names to Merge In%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+import delimited "Data/RR_names_years_corrected.csv", clear varn(1)
+
+tempfile stn_cnames
+save `stn_cnames', replace
+
 *%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-use assets, clear
+use Data/assets, clear
 	keep if sector == "RR"
-	ren cid RRid
+	merge 1:1 cname year_std using `stn_cnames', keep(3) nogen
 	tempfile assets
 	save `assets', replace
 
-use "Thesis/Merges/UW_1880-1920_top10.dta", clear
-preserve
-	keep year_std year RRid
+use "Thesis/Merges/RR_boards_wtitles.dta", clear
+	drop if cname == "KEOKUK AND DES MOINES RAILROAD" & year_std == 1890
+merge m:1 cname year_std using `stn_cnames', keep(3) nogen
+	egen id = group(cname_stn)
+/*preserve
+	keep year_std RRid
 	duplicates drop
 	reshape wide year, i(RRid) j(year_std)
 	*keep if year1890 != . & year1910 != .
 	keep RRid
 	tempfile keep_rrs
 	save `keep_rrs', replace
-restore
+restore*/
 
 *merge m:1 RRid using `keep_rrs', nogen keep(3)
 
-merge m:1 cname year_std using `assets', keepus(assets)
+merge m:1 cname_stn year_std using `assets', keepus(assets) keep(1 3)
+
 
 *merge m:1 cname using "RR_Financials1890.dta", nogen keepus(region)
 
@@ -67,118 +78,84 @@ merge m:1 RRid year_std using `acctg', nogen keepus(assets bfdebt bvlev) update 
 drop if inlist(cname, "Metropolitan Elevated Railway", "New York Elevated Railroad", ///
 					"New York and Elevated Railroad")
 		
-include "Gilded Age Boards/assign_regions.do"
+include "../GitHub/gilded_age_boards/assign_regions.do"
 	
 #delimit ;
 * JTA: https://babel.hathitrust.org/cgi/pt?id=mdp.39015020928050&view=1up&seq=7;
-*gen jta = inlist(RRid, 6, 44, 12, 63, 60, 24, 66, 30, 67)
-		| inlist(RRid, 62, 38, 70, 43, 171, 72, 189, 73, 56);
-gen jta = inlist(cname, "BALTIMORE & OHIO", /*6*/
-						"BALTIMORE & OHIO RAILROAD CO.",
-						"Baltimore & Ohio",
-						"Baltimore and Ohio Railroad",
-						"Baltimore and Ohio")
-		| inlist(cname, "CENTRAL RAILROAD COMPANY OF NEW JERSEY", /*44*/
-						"Central Railroad Of New Jersey",
+gen jta = inlist(cname_stn, "Baltimore & Ohio",
 						"Central of New Jersey",
-						"CHESAPEAKE & OHIO RAILWAY CO.", /*12*/
-						"CHESAPEAKE, OHIO & SOUTHWESTERN", "Chesapeake & Ohio",
-						"Chesapeake and Ohio Railway")
-		| inlist(cname, "Cleve Cincin Chic & St Louis", 
-						"CLEVELAND, CINCINNATI, CHICAGO & ST. LOUIS RAILWAY CO.",
-						"CLEVELAND, CINCINNATI, ST. LOUIS & CHICAGO", /*63*/
-						"DELAWARE, LACKAWANNA & WESTERN", /*60*/
-						"DELAWARE, LACKAWANNA & WESTERN RAILROAD CO.",
-						"Delaware, Lackawanna and Western Railroad",
+						"Chesapeake & Ohio",
+						"Cleve Cincin Chic & St Louis",
 						"Delaware Lackaw & Western",
-						"Erie" /*24*/)
-		| inlist(cname, "LAKE SHORE & MICHIGAN SOUTHERN", /*66*/
-						"LAKE SHORE & MICHIGAN SOUTHERN RAILWAY CO.",
+						"Erie",
 						"Lake Shore & Mich Southern",
-						"Lake Shore and Michigan Southern Railway",
-						"Lakeshore and Michigan Southern Railway",
-						"Lehigh Valley" /*30*/)
-		| inlist(cname, "MICHIGAN CENTRAL", /*67*/
-						"MICHIGAN CENTRAL RAILROAD CO.",
-						"Michigan Central",
-						"Michigan Central Railroad",
-						"NEW YORK CENTRAL & HUDSON RIVER" /*62*/,
-						"NEW YORK CENTRAL & HUDSON RIVER RAILROAD CO.",
-						"New York Central & Hudson River Railroad",
-						"New York Central, Hudson River and Fort Orange Rail Road")
-		| inlist(cname, "NEW YORK, ONTARIO AND WESTERN RAILWAY COMPANY",
-						"New York, Ontario and Western Railway", /*38*/
-						"PENNSYLVANIA RAILROAD CO.", /*70*/
+						"Lehigh Valley",
+						"Michigan Central")
+		| inlist(cname_stn, "NY Central & Hudson River",
+						"NY Ontario & Western",
 						"Pennsylvania RR",
-						"PHILADELPHIA & READING", /*43*/
-						"PHILADELPHIA & READING RAILROAD CO.",
-						"Philadelphia and Reading Railroad")
-		| inlist(cname, "PITTSBURGH & WESTERN", /*171*/
-						"PITTSBURGH & WESTERN RAILROAD CO.",
+						"Reading",
+						"PITTSBURGH & WESTERN",
 						"Pitts Cin Chic & St Louis",
-						"Pitt Cin Chic & St. Louis",
-						"PITTSBURGH, CINCINNATI, CHICAGO & ST. LOUIS" /*72*/)
-		| inlist(cname, "Pitts Cin Chic & St Louis",
-						"TOLEDO, PEORIA & WESTERN",  /*189*/
-						"Vandalia", /*73*/
-						"WABASH RAILROAD",
-						"WABASH RAILROAD CO.", /*56*/
-						"Wabash", "Wabash, St. Louis and Pacific Railway");			
+						"TOLEDO, PEORIA & WESTERN",
+						"Vandalia",
+						"Wabash");			
 #delimit cr
 
 keep if director
-br
-pause
 
 preserve
-	keep year_std fullname_m cname /*RRid*/
+	keep year_std fullname_m cname_stn id
 	duplicates drop
 	merge m:1 fullname_m year_std using `temp_uw', keep(1 3) keepus(bankname)
 		gen banker = _merge == 3
 		drop _merge bankname
-	foreach var in cname /*RRid*/ {
+	foreach var in cname_stn id {
 		ren `var' `var'B
 	}
 	tempfile rrs
 	save `rrs', replace
 
-	foreach var in cname /*RRid*/ {
+	foreach var in cname_stn id {
 		ren `var'B `var'A
 	}
 
 	joinby fullname_m year_std using `rrs', _merge(_m_int)
 	drop if fullname_m == ""
-	drop if cnameA == cnameB
 	gen interlock = _m_int == 3
-
-	keep year_std interlock banker cname? /*RRid?*/
+		replace interlock = 0 if cname_stnA == cname_stnB
+		replace banker = 0 if interlock == 0
+		br fullname_m interlock banker cname_stnB cname_stnA year_std ///
+			if year_std == 1905 
+			*& cname_stnA == "Cleve Cincin Chic & St Louis"
+		pause
+	keep year_std interlock banker cname_stn? id?
 	collapse  (sum) banker_tot = banker interlock_tot = interlock ///
-			  (max) banker interlock, by(year_std cname? /*RRid?*/)
+			  (max) banker interlock (last) cname_stn?, by(year_std id?)
 	tempfile interlocks
 	save `interlocks', replace
 restore
 
-keep year_std cname /*RRid*/ region assets /*bfdebt bvlev*/ region jta
+keep year_std cname cname_stn id region assets /*bfdebt bvlev*/ region jta
 duplicates drop
-foreach var in cname /*RRid*/ assets /*bfdebt bvlev*/ region jta {
+foreach var in cname cname_stn id assets /*bfdebt bvlev*/ region jta {
 	ren `var' `var'B
 }
 tempfile self
 save `self', replace
-foreach var in cname /*RRid*/ assets /*bfdebt bvlev*/ region jta {
+foreach var in cname cname_stn id assets /*bfdebt bvlev*/ region jta {
 	ren `var'B `var'A
 }
 
 joinby year_std using `self'
-merge 1:1 year_std cnameA cnameB using `interlocks'
+merge 1:1 year_std cname_stnA cname_stnB using `interlocks'
 
-egen pairid = group(cnameA cnameB)
+egen pairid = group(idA idB)
+
 xtset pairid year_std
-	drop if cnameA == cnameB
-		*keep if RRidA < RRidB
-	replace interlock = 0 if interlock == .
-	replace banker = 0 if banker == .
-	replace banker_tot = 0 if banker_tot == .
+	foreach var of varlist interlock banker interlock_tot banker_tot {
+	    replace `var' = 0 if `var' == .
+	}
 	gen same_reg = regionA == regionB
 	gen sum_assets = assetsA + assetsB
 	gen ln_sum_assets  = ln(sum_assets)
@@ -198,22 +175,22 @@ forval y = 1880(5)1920 {
 		lab var banker ""
 		ren banker banker_unique
 		ren same_reg same_reg_unique
-			replace same_reg_unique = . if interlock_tot == .
+			replace same_reg_unique = 0 if interlock_unique == 0
 		gen same_reg_tot = same_reg_unique * interlock_tot
 		keep if year_std == `y'
 		collapse (sum) interlock_* banker_* same_reg_tot same_reg_unique (max) assetsA, ///
 			by(cnameA year_std)
 		merge 1:1 cnameA year_std using `nd', keep(3) nogen
 		replace assetsA = assetsA/1000000
-		lab var interlock_tot "interlock_tot"
-		lab var banker_tot "banker_tot"
-		
+
 		eststo rr_summ_`y': estpost summ interlock_tot interlock_unique ///
 							banker_tot banker_unique same_reg_tot same_reg_unique ///
 							assetsA n_directors, d
 	restore
 }
 
+lab var interlock_tot "interlock_tot"
+lab var banker_tot "banker_tot"
 lab var assetsA "Assets ($ Mil)"
 #delimit ;
 esttab rr_summ_???? using "Thesis/Interlocks/RR_firm_summs.csv", replace
@@ -222,11 +199,10 @@ esttab rr_summ_???? using "Thesis/Interlocks/RR_firm_summs.csv", replace
 	label note(" ");
 #delimit cr
 *-------------------------------------------------------------------------------
-
+	
+	keep if idA < idB
 	gen assets_ratio = assetsA/assetsB
-		drop if assets_ratio < 1
-		drop if assetsA == . & assetsB != .
-		*replace assets_ratio = 1/assets_ratio if assets_ratio < 1
+		replace assets_ratio = 1/assets_ratio if assets_ratio < 1
 		lab var assets_ratio "Ratio of Assets (Large/Small)"
 	forval y = 1880(5)1920 {
 		* Sum of Assets
@@ -290,8 +266,7 @@ esttab rr_summ_???? using "Thesis/Interlocks/RR_firm_summs.csv", replace
 xtset pairid year_std
 
 #delimit ;
-/* PROBLEM: RR NAMES UNSTABLE, CAN'T DO PANEL YET
-
+/*
 eststo r1a1, title("Interlocks     JTA Only"):
 				xtreg interlock jta_X_post, vce(cluster pairid) fe;
 eststo r1a3, title("Interlocks        Same Reg & JTA"):
@@ -336,16 +311,19 @@ eststo r3c2, title("Bankers        Same Reg & JTA (w/ Controls)          Cond. o
 				same_reg_X_post jta_X_post  same_reg_X_jta_X_post
 				ln_sum_assets assets_ratio if interlock, vce(cluster pairid) fe;*/
 	
-esttab r* using "Thesis/Interlocks/RR_interlock_regs.csv", replace
+esttab r* using "Thesis/Interlocks/RR_interlock_xtregs.csv", replace
 	star(+ 0.10 * 0.05 ** 0.01 *** 0.001) mtitles se;
-	*/
+*/
 
-
-forval yr = 1890(10)1920 {;
+est clear;
+forval yr = 1890(5)1920 {;
 	if `yr' == 1890 local abc "a";
-	if `yr' == 1900 local abc "b";
-	if `yr' == 1910 local abc "c";
-	if `yr' == 1920 local abc "d";
+	if `yr' == 1895 local abc "b";
+	if `yr' == 1900 local abc "c";
+	if `yr' == 1905 local abc "d";
+	if `yr' == 1910 local abc "e";
+	if `yr' == 1915 local abc "f";
+	if `yr' == 1920 local abc "g";
 	
 	
 	eststo r1`abc', title("Interlock       `yr'"):
@@ -379,7 +357,7 @@ esttab s1* s2* /*s3**/ using "Thesis/Interlocks/RR_simplified_interlock_regs.csv
 				
 
 #delimit cr
-
+/*
 lab var same_reg_X_jta "RRs in Same Region & in JTA"
 
 forval y = 1880(5)1920 {
@@ -472,7 +450,7 @@ esttab assets_intnotbnk???? using "Thesis/Interlocks/RR_interlock_summs.csv", ap
 	mtitles("1880" "1885" "1890" "1895" "1900" "1905" "1910" "1915" "1920")
 	label note(" ") title("Non-Banker Interlocks");
 	
-	
+	*/
 #delimit cr
 	sdf
 *%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

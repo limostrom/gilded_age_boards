@@ -12,7 +12,7 @@ pause on
 
 local png_ops "as(png) replace width(1500)"
 
-cap cd "C:\Users\lmostrom\Documents\PersonalResearch\"
+cap cd "C:\Users\lmostrom\Documents\Gilded Age Boards - Scratch\"
 
 ********************************************************************************
 local run_1 0 // # RRs over time
@@ -52,8 +52,8 @@ local ngram 0 // load in google ngram results and plots
 *%% Prep Industry Datasets %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 forval y = 1895(5)1920 {
-    import excel cname cid Entrant Industry using "industrials_interlocks_coded.xlsx", ///
-		clear sheet("`y'") cellrange(A2)
+    import excel cname cid Entrant Industry ///
+		using "Data/industrials_interlocks_coded.xlsx", clear sheet("`y'") cellrange(A2)
 	gen year_std = `y'
 	tempfile ind`y'
 	save `ind`y'', replace
@@ -71,7 +71,7 @@ save `industries', replace
 
 *%%Prep Underwriter Dataset%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 cap cd  "/Users/laurenmostrom/Dropbox/Mostrom_Thesis_2018/Post-Thesis" // old computer
-cd "C:\Users\lmostrom\Documents\PersonalResearch\"
+cap cd "C:\Users\lmostrom\Documents\Gilded Age Boards - Scratch\"
 
 use "Thesis/Merges/UW_1880-1920_top10.dta", clear
 
@@ -84,7 +84,7 @@ save `temp_uw', replace
 
 *%%Load Railroad or Industrials Dataset%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 cap cd  "/Users/laurenmostrom/Dropbox/Mostrom_Thesis_2018/Post-Thesis" // old computer
-cd "C:\Users\lmostrom\Documents\PersonalResearch\"
+cap cd "C:\Users\lmostrom\Documents\Gilded Age Boards - Scratch\"
 
 use year_std cname fullname_m director sector RRid newly_added ///
 	using "Thesis/Merges/RR_boards_wtitles.dta", clear
@@ -435,13 +435,14 @@ restore;
 ********************************************************************************
 if `run_6' == 1 {
 ********************************************************************************
+
 foreach unique in "tot" "unique" {
     if "`unique'" == "tot" local ti "Total"
     if "`unique'" == "unique" local ti "Unique"
 foreach ind in "" "_indtop10" {
 	if "`ind'" == "" local subti "Top 10 Underwriters by Volume"
 	if "`ind'" == "_indtop10" local subti "Top 10 Underwriters by Ind Board Seats"
-	
+/*	
 	use "Thesis/Interlocks/interlocks_coded.dta", clear
 
 	if "`unique'" == "unique" {
@@ -509,10 +510,10 @@ foreach ind in "" "_indtop10" {
 	graph export "Gilded Age Boards/mean_interlocks_`unique'`ind'_unrelated.png",
 				replace as(png) wid(1200) hei(800);
 	#delimit cr
+*/
 }
 *-----------------------------------------------------
-
-use "Gilded Age Boards/rr_interlocks_coded.dta", clear
+use "Data/rr_interlocks_coded.dta", clear
 
 if "`unique'" == "unique" {
     replace banker = 0 if interlock == 0
@@ -531,6 +532,7 @@ else {
 
 collapse (sum) interlocks_same interlocks_vert bankers_same bankers_vert, ///
 				by(cnameA year_std)
+
 collapse (mean) interlocks_same interlocks_vert bankers_same bankers_vert, by(year_std)
 
 #delimit ;
@@ -542,7 +544,7 @@ tw (line interlocks_same year_std, lc(black) lp(l))
    (scatter bankers_same year_std, mc(gs7) msym(Oh)),
   legend(order(1 "Interlocks" 2 "Banker Interlocks") r(1))
   yti("") xti("") ti("Mean `ti' RR Interlocks in the Same Region");
-graph export "Gilded Age Boards/mean_rr_interlocks_`unique'_same_ind.png",
+graph export "Output/Plots/mean_rr_interlocks_`unique'_same_ind.png",
 			replace as(png) wid(1200) hei(800);
 tw (line interlocks_vert year_std, lc(black) lp(l))
    (line bankers_vert year_std, lc(gs7) lp(l))
@@ -552,7 +554,7 @@ tw (line interlocks_vert year_std, lc(black) lp(l))
    (scatter bankers_vert year_std, mc(gs7) msym(Oh)),
   legend(order(1 "Interlocks" 2 "Banker Interlocks") r(1))
   yti("") xti("") ti("Mean `ti' RR Interlocks in Other Regions");
-graph export "Gilded Age Boards/mean_rr_interlocks_`unique'_vertical.png",
+graph export "Output/Plots/mean_rr_interlocks_`unique'_vertical.png",
 			replace as(png) wid(1200) hei(800);
 #delimit cr
 }
@@ -845,7 +847,7 @@ graph export "`plot_dir'prop_firms_w_early_uw_bysector.png", `png_ops';
 ********************************************************************************
 if `prop_top10_plus_early' == 1 {
 ********************************************************************************
-import delimited "all_Puw_top10_plus_early_bysector.csv", varn(1) clear
+import delimited "../../all_Puw_top10_plus_early_bysector.csv", varn(1) clear
 
 #delimit ;
 tw (line puw year_std if sector == "RR", lc(black) lp(l))

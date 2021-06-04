@@ -3,7 +3,8 @@ assign_regions.do
 */
 
 
-merge m:1 cname using "RR_Financials1890.dta", nogen keep(1 3) keepus(region)
+merge m:1 cname using "Data/RR_Financials1890.dta", ///
+			nogen keep(1 3) keepus(region)
 
 replace region = "N" if inlist(cname, "ALBANY & SUSQUEHANNA", "Albany and Susquehanna Railroad", "A&S")
 replace region = "N" if cname == "Ann Arbor"
