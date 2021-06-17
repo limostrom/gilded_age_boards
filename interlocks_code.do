@@ -11,11 +11,10 @@ cap log close
 pause on
 
 cap cd "C:/Users/lmostrom/Documents/Gilded Age Boards - Scratch"
+cap cd "C:/Users/17036/Dropbox/Personal Document Backup/Gilded Age Boards - Scratch"
+global repo "C:/Users/17036/OneDrive/Documents/GitHub/gilded_age_boards"
 
 *%%Prep Underwriter Dataset%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-cap cd  "/Users/laurenmostrom/Dropbox/Mostrom_Thesis_2018/Post-Thesis" // old computer
-cd "C:\Users\lmostrom\Documents\Gilded Age Boards - Scratch\"
-
 use fullname_m year_std using "Thesis/Merges/UW_1880-1920_top10.dta", clear
 duplicates drop
 tempfile top10
@@ -28,7 +27,7 @@ save `indtop10', replace
 
 *%% Code Railroad Interlocks %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 use cname fullname_m director year_std using "Thesis/Merges/RR_boards_wtitles.dta", clear
-include "../GitHub/gilded_age_boards/assign_regions.do"
+include "$repo/assign_regions.do"
 keep if director
 drop director
 
@@ -64,10 +63,10 @@ bys cnameA cnameB year_std: ereplace banker = max(banker)
 duplicates drop
 
 save "Data/rr_interlocks_coded.dta", replace
-	sdf
+	
 *%% Prep Industry Datasets %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 forval y = 1895(5)1920 {
-    import excel cname cid Entrant Industry using "industrials_interlocks_coded.xlsx", ///
+    import excel cname cid Entrant Industry using "Data/industrials_interlocks_coded.xlsx", ///
 		clear sheet("`y'") cellrange(A2)
 	gen year_std = `y'
 	replace cname = "Natinoal Linseed Oil" if cname == "National Linseed Oil" & year_std == 1895
@@ -85,10 +84,8 @@ drop if cname == ""
 
 tempfile industries
 save `industries', replace
-*%%Load Industrials Dataset%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-cap cd  "/Users/laurenmostrom/Dropbox/Mostrom_Thesis_2018/Post-Thesis" // old computer
-cd "C:\Users\lmostrom\Documents\PersonalResearch\"
 
+*%%Load Industrials Dataset%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 use year_std cname fullname_m director sector cid ///
 	using "Thesis/Merges/Ind_boards_wtitles.dta", clear
 
@@ -114,7 +111,7 @@ restore
 drop if _merge == 1
 drop _merge
 
-merge m:1 cname year_std using "assets_ind.dta", assert(2 3)
+merge m:1 cname year_std using "Data/assets_ind.dta", assert(2 3)
 *pause
 drop if _merge == 2
 drop _merge
@@ -139,13 +136,13 @@ joinby fullname_m year_std using `self'
 drop fullname_m
 
 gen interlock = (cnameA != cnameB)
+	replace banker = 0 if interlock == 0
 bys cnameA cnameB year_std: egen n_totints = total(interlock)
 bys cnameA cnameB year_std: egen n_bnkints = total(banker)
 bys cnameA cnameB year_std: egen n_bnkints_indtop10 = total(banker_indtop10)
 bys cnameA cnameB year_std: ereplace banker = max(banker)
 bys cnameA cnameB year_std: ereplace banker_indtop10 = max(banker_indtop10)
 duplicates drop
-
 
 	foreach X in "A" "B" {
 		replace ind`X' = "Mining / Smelting & Refining" if inlist(ind`X', "Mining/Metals", ///
@@ -2283,63 +2280,5 @@ replace vertical = 1 if ///
 	| (cnameA == "Worthington Pump and Machinery" & cnameB == "Willys Overland")
 	
 replace no_relationship = 1 if interlock & vertical + horizontal == 0 & year_std == 1920
-	
-	
-g byte v_possible = inlist(indB, "Chemicals", "Farming Machinery", ///
-								"Food & Beverages", "Land/Real Estate") ///
-	if indA == "Agriculture"
-replace v_possible = inlist(indB, "Engines", "General Manufacturing", "Rubber", "Steel") ///
-	if indA == "Automobiles"
-replace v_possible = inlist(indB, "Agriculture", "Sugar", "Tobacco") ///
-	if indA == "Chemicals"
-replace v_possible = inlist(indB, "Leather", "Retail", "Textiles") ///
-	if indA == "Consumer Goods"
-replace v_possible = inlist(indB, "Automobiles", "Farming Machinery", ///
-								"General Manufacturing", "Locomotives") ///
-	if indA == "Engines"
-replace v_possible = 0 if indA == "Entertainment"
-replace v_possible = inlist(indB, "Locomotives", "Mining / Smelting & Refining", "Shipping") ///
-	if indA == "Express"
-replace v_possible = inlist(indB, "Agriculture", "Engines", "General Manufacturing", ///
-								"Steel", "Sugar", "Tobacco") ///
-	if indA == "Farming Machinery"
-replace v_possible = inlist(indB, "Agriculture", "Retail", "Sugar") ///
-	if indA == "Food & Beverages"
-replace v_possible = inlist(indB, "Automobiles", "Engines", "Farming Machinery", ///
-								"Locomotives", "Steel") ///
-	if indA == "General Manufacturing"
-replace v_possible = 0 if inlist(indA, "Holding", "Insurance")
-replace v_possible = inlist(indB, "Agriculture") ///
-	if indA == "Land/Real Estate"
-replace v_possible = inlist(indB, "Consumer Goods", "Leather", "Retail", "Textiles") ///
-	if indA == "Leather"
-replace v_possible = inlist(indB, "Engines", "Express", "General Manufacturing", ///
-								"Mining / Smelting & Refining", "Steel") ///
-	if indA == "Locomotives"
-replace v_possible = inlist(indB, "Express", "Locomotives", "Mining / Smelting & Refining", ///
-								"Steel") ///
-	if indA == "Mining / Smelting & Refining"
-replace v_possible = 0 if inlist(indA, "Oil", "Paper", "Pharmaceuticals")
-replace v_possible = inlist(indB, "Consumer Goods", "Food & Beverages", "Leather", ///
-								"Textiles", "Tobacco", "Wholesale Dry Goods") ///
-	if indA == "Retail"
-replace v_possible = inlist(indB, "Automobiles") ///
-	if indA == "Rubber"
-replace v_possible = inlist(indB, "Express") ///
-	if indA == "Shipping"
-replace v_possible = inlist(indB, "Automobiles", "Farming Machinery", "General Manufacturing", ///
-								"Locomotives", "Mining / Smelting & Refining") ///
-	if indA == "Steel"
-replace v_possible = inlist(indB, "Chemicals", "Farming Machinery") ///
-	if indA == "Sugar"
-replace v_possible = inlist(indB, "Consumer Goods", "Leather", "Retail") ///
-	if indA == "Textiles"
-replace v_possible = inlist(indB, "Chemicals", "Farming Machinery", "Retail") ///
-	if indA == "Tobacco"
-replace v_possible = inlist(indB, "Retail") ///
-	if indA == "Wholesale Dry Goods"
-replace v_possible = 0 if v_possible == .
-	
-gen same_ind = indA == indB
 	
 save "Thesis/Interlocks/interlocks_coded.dta", replace

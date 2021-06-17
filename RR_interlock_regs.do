@@ -7,6 +7,8 @@ cap log close
 pause on
 
 cap cd "C:\Users\lmostrom\Documents\Gilded Age Boards - Scratch\"
+cap cd "C:\Users\17036\Dropbox\Personal Document Backup\Gilded Age Boards - Scratch\"
+global repo "C:/Users/17036/OneDrive/Documents/GitHub/gilded_age_boards"
 
 *%% Prep Number of Directors Variable %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -20,9 +22,6 @@ tempfile nd
 save `nd', replace
 
 *%%Prep Underwriter Dataset%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-cap cd  "/Users/laurenmostrom/Dropbox/Mostrom_Thesis_2018/Post-Thesis" // old computer
-cap cd "C:\Users\lmostrom\Documents\Gilded Age Boards - Scratch\"
-
 use "Thesis/Merges/UW_1880-1920_top10.dta", clear
 
 egen tagged = tag(fullname_m year_std)
@@ -47,7 +46,7 @@ use Data/assets, clear
 	save `assets', replace
 
 use "Thesis/Merges/RR_boards_wtitles.dta", clear
-	drop if cname == "KEOKUK AND DES MOINES RAILROAD" & year_std == 1890
+	drop if cname == "KEOKUK AND DES MOINES RAILROAD" & year_std == 1890 // duplicate
 merge m:1 cname year_std using `stn_cnames', keep(3) nogen
 	egen id = group(cname_stn)
 /*preserve
@@ -78,7 +77,7 @@ merge m:1 RRid year_std using `acctg', nogen keepus(assets bfdebt bvlev) update 
 drop if inlist(cname, "Metropolitan Elevated Railway", "New York Elevated Railroad", ///
 					"New York and Elevated Railroad")
 		
-include "../GitHub/gilded_age_boards/assign_regions.do"
+include "$repo/assign_regions.do"
 	
 #delimit ;
 * JTA: https://babel.hathitrust.org/cgi/pt?id=mdp.39015020928050&view=1up&seq=7;
@@ -128,7 +127,6 @@ preserve
 		br fullname_m interlock banker cname_stnB cname_stnA year_std ///
 			if year_std == 1905 
 			*& cname_stnA == "Cleve Cincin Chic & St Louis"
-		pause
 	keep year_std interlock banker cname_stn? id?
 	collapse  (sum) banker_tot = banker interlock_tot = interlock ///
 			  (max) banker interlock (last) cname_stn?, by(year_std id?)
@@ -180,9 +178,10 @@ forval y = 1880(5)1920 {
 		keep if year_std == `y'
 		collapse (sum) interlock_* banker_* same_reg_tot same_reg_unique (max) assetsA, ///
 			by(cnameA year_std)
-		merge 1:1 cnameA year_std using `nd', keep(3) nogen
+		merge 1:1 cnameA year_std using `nd', keep(1 3) nogen
+		replace n_directors = 0 if n_directors == .
 		replace assetsA = assetsA/1000000
-
+		
 		eststo rr_summ_`y': estpost summ interlock_tot interlock_unique ///
 							banker_tot banker_unique same_reg_tot same_reg_unique ///
 							assetsA n_directors, d
@@ -198,6 +197,8 @@ esttab rr_summ_???? using "Thesis/Interlocks/RR_firm_summs.csv", replace
 	mtitles("1880" "1885" "1890" "1895" "1900" "1905" "1910" "1915" "1920")
 	label note(" ");
 #delimit cr
+
+est clear
 *-------------------------------------------------------------------------------
 	
 	keep if idA < idB
@@ -266,7 +267,7 @@ esttab rr_summ_???? using "Thesis/Interlocks/RR_firm_summs.csv", replace
 xtset pairid year_std
 
 #delimit ;
-/*
+
 eststo r1a1, title("Interlocks     JTA Only"):
 				xtreg interlock jta_X_post, vce(cluster pairid) fe;
 eststo r1a3, title("Interlocks        Same Reg & JTA"):
@@ -313,7 +314,7 @@ eststo r3c2, title("Bankers        Same Reg & JTA (w/ Controls)          Cond. o
 	
 esttab r* using "Thesis/Interlocks/RR_interlock_xtregs.csv", replace
 	star(+ 0.10 * 0.05 ** 0.01 *** 0.001) mtitles se;
-*/
+
 
 est clear;
 forval yr = 1890(5)1920 {;

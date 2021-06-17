@@ -8,8 +8,8 @@ cap log close
 pause on
 
 cap cd "C:\Users\lmostrom\Documents\PersonalResearch\"
-
-*%% Prep Number of Directors Variable %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+cap cd "C:/Users/17036/Dropbox/Personal Document Backup/Gilded Age Boards - Scratch"
+global repo "C:/Users/17036/OneDrive/Documents/GitHub/gilded_age_boards"
 
 use fullname_m cname year_std director using "Thesis/Merges/Ind_boards_wtitles.dta", clear
 append using "Thesis/Merges/Util_boards_final.dta", keep(fullname_m cname year_std director)
@@ -21,10 +21,11 @@ ren cname cnameA
 tempfile nd
 save `nd', replace
 
+
 *%% Prep Industry Datasets %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 forval y = 1895(5)1920 {
-    import excel cname cid Entrant Industry using "industrials_interlocks_coded.xlsx", ///
+    import excel cname cid Entrant Industry using "Data/industrials_interlocks_coded.xlsx", ///
 		clear sheet("`y'") cellrange(A2)
 	gen year_std = `y'
 	replace cname = "Natinoal Linseed Oil" if cname == "National Linseed Oil" & year_std == 1895
@@ -60,7 +61,7 @@ ren cidB cidA
 preserve
 	isid cnameA year_std
 	ren cnameA cname
-	merge 1:1 cname year_std using "assets_ind.dta", keep(3) nogen
+	merge 1:1 cname year_std using "Data/assets_ind.dta", keep(3) nogen
 	collapse (p1) pctl1 = assets (p5) pctl5 = assets (p10) pctl10 = assets ///
 			(p15) pctl15 = assets (p20) pctl20 = assets (p25) pctl25 = assets ///
 			(p30) pctl30 = assets (p35) pctl35 = assets (p40) pctl40 = assets ///
@@ -78,7 +79,7 @@ restore
 preserve
 	isid cnameA year_std
 	ren cnameA cname
-	merge 1:1 cname year_std using "assets_ind.dta", keep(3) nogen
+	merge 1:1 cname year_std using "Data/assets_ind.dta", keep(3) nogen
 	merge m:1 year_std using `bounds', nogen keep(3)
 	keep if inrange(assets, pctl15, pctl25)
 	keep cname year_std assets
@@ -88,14 +89,14 @@ restore
 joinby year_std using `self'
 
 ren cnameA cname
-merge m:1 cname year_std using "assets_ind.dta", keep(3) nogen
+merge m:1 cname year_std using "Data/assets_ind.dta", keep(3) nogen
 	ren assets assetsA
 merge m:1 cname year_std using `industries', nogen keep(1 3) keepus(Industry Entrant)
 	ren Industry indA
 	ren Entrant entrantA
 ren cname cnameA
 ren cnameB cname
-merge m:1 cname year_std using "assets_ind.dta", keep(3) nogen
+merge m:1 cname year_std using "Data/assets_ind.dta", keep(3) nogen
 	ren assets assetsB
 merge m:1 cname year_std using `industries', nogen keep(1 3) keepus(Industry Entrant)
 	ren Industry indB
@@ -132,19 +133,9 @@ gen sum_entrants = indA_entrants + indB_entrants
 	lab var sum_entrants "Total Entrants in Both Industries"
 
 merge 1:1 cnameA cnameB year_std using "Thesis/Interlocks/interlocks_coded.dta", ///
-	keepus(interlock banker banker_indtop10 vertical horizontal no_relationship assetsA assetsB)
-gen sum_assets = assetsA + assetsB
-gen ln_sum_assets = ln(sum_assets)
-	replace sum_assets = sum_assets/1000000
-	lab var sum_assets "Total Assets of Both Firms ($ M)"
-
-drop if interlock == 0 & cnameA == cnameB
-assert inlist(interlock, ., 1)
-replace interlock = 0 if interlock == .
-	replace banker = 0 if interlock == 0
-	replace banker_indtop10 = 0 if interlock == 0
-recast byte interlock
-
+	keepus(interlock banker banker_indtop10 n_totints n_bnkints n_bnkints_indtop10 ///
+			vertical horizontal no_relationship assetsA assetsB)
+* --- V Possible & Same Ind ----------------------------------------------------
 g byte v_possible = inlist(indB, "Chemicals", "Farming Machinery", ///
 								"Food & Beverages", "Land/Real Estate") ///
 	if indA == "Agriculture"
@@ -201,7 +192,20 @@ replace v_possible = inlist(indB, "Retail") ///
 replace v_possible = 0 if v_possible == .
 	
 gen same_ind = indA == indB
-	
+* ------------------------------------------------------------------------------
+gen sum_assets = assetsA + assetsB
+gen ln_sum_assets = ln(sum_assets)
+	replace sum_assets = sum_assets/1000000
+	lab var sum_assets "Total Assets of Both Firms ($ M)"
+replace assetsA = assetsA/1000000
+	lab var assetsA "Assets ($ Mil)"
+replace assetsB = assetsB/1000000
+	lab var assetsB "Assets ($ Mil)"
+
+drop if interlock == 0 & cnameA == cnameB
+assert inlist(interlock, ., 1)
+
+
 egen pairid = group(cidA cidB)
 xtset pairid year_std
 
@@ -219,7 +223,7 @@ bys pairid: egen minyr = min(year_std)
 drop maxyr
 
 preserve
-	drop if minyr == 1920
+	*drop if minyr == 1920
 	egen firm_tag = tag(cidA year_std)
 	gen int_same_ind = same_ind & interlock
 	gen int_v_poss = v_possible & interlock
@@ -229,7 +233,6 @@ preserve
 	    egen `var'_tag = tag(`var' interlock cidA year_std)
 			replace `var'_tag = 0 if interlock == 0 | `var' == 0
 	}
-	replace assetsA = assetsA/1000000
 	collapse (sum) firm_tag interlock interlock_tag banker entrants = entrantA_tag ///
 			 (sum) same_ind_tag v_possible_tag horizontal vertical no_relationship ///
 					horizontal_tag vertical_tag no_relationship_tag ///
@@ -255,10 +258,10 @@ preserve
 	lab var sh_firms_wh "% of Firms w/ a Horizontal Interlock"
 	lab var sh_firms_wvposs "% of Firms w/ a Poss. Vert. Interlock"
 	lab var sh_firms_wv "% of Firms w/ a Vertical Interlock"
-	lab var assets_p25 "Assets p25"
-	lab var assets_med "Assets Median"
-	lab var assets_mean "Assets Mean"
-	lab var assets_p75 "Assets p75"
+	lab var assets_p25 "Assets p25 ($ Mil)"
+	lab var assets_med "Assets Median ($ Mil)"
+	lab var assets_mean "Assets Mean ($ Mil)"
+	lab var assets_p75 "Assets p75 ($ Mil)"
 	export excel year_std indA firm_tag entrants interlock banker horizontal vertical ///
 					sh_firms_wint sh_firms_wsame sh_firms_wh sh_firms_wvposs sh_firms_wv ///
 					assets_p25 assets_med assets_mean assets_p75 ///
@@ -267,58 +270,71 @@ preserve
 restore
 
 *-------------------- Firm-Level Summary Stats ---------------------------------
+gen unr_ind = same_ind == 0 & v_possible == 0
+
+gen interlocks_unique = interlock
+ren n_totints interlocks_tot
+gen bnkints_unique = banker
+ren n_bnkints bnkints_tot
+gen bnkints_indtop10_unique = banker_indtop10
+ren n_bnkints_indtop10 bnkints_indtop10_tot
+
+gen vertical_tot = vertical * interlocks_tot
+gen vertical_unique = vertical
+gen horizontal_tot = horizontal * interlocks_tot
+gen horizontal_unique = horizontal
+gen no_relationship_tot = no_relationship * interlocks_tot
+gen no_relationship_unique = no_relationship
+gen v_possible_tot = v_possible * interlocks_tot
+gen v_possible_unique = v_possible * interlock
+gen same_ind_tot = same_ind * interlocks_tot
+gen same_ind_unique = same_ind * interlock
+gen unr_ind_tot = unr_ind * interlocks_tot
+gen unr_ind_unique = unr_ind * interlock
+		
 #delimit ;
-forval y = 1900(5)1920 {;
+forval y = 1895(5)1920 {;
 	preserve;
 		keep if year_std == `y';
-		
-		replace same_ind = . if interlock == 0;
-		replace v_possible = . if interlock == 0;
-		br;
-		pause;
-		
-		collapse (sum) interlock_tot = interlock banker_tot = banker
-						banker_indtop10_tot = banker_indtop10 
-						same_ind_tot = same_ind horizontal_tot = horizontal
-						v_possible_tot = v_possible vertical_tot = vertical
-						no_relationship_tot = no_relationship
-				 (max) interlock_unique = interlock banker_unique = banker
-						banker_indtop10_unique = banker_indtop10 
-						same_ind_unique = same_ind horizontal_unique = horizontal
-						v_possible_unique = v_possible vertical_unique = vertical
-						no_relationship_unique = no_relationship assetsA
-				, by(cnameA cnameB year_std);
-				pause;
-		collapse (sum) interlock_* banker_*	same_ind_* horizontal_*
-						v_possible_* vertical_*	no_relationship_*
+	
+		*pause;
+		#delimit ;
+		collapse (sum) interlocks_* bnkints_* vertical_* horizontal_* no_relationship_*
+						v_possible_* same_ind_* unr_ind_*
+				 (max) assetsA, by(cnameA cnameB year_std);
+				 
+		collapse (sum) interlocks_* bnkints_* vertical_* horizontal_* no_relationship_*
+						v_possible_* same_ind_* unr_ind_*
 				 (max) assetsA, by(cnameA year_std);
 				 
 		merge 1:1 cnameA year_std using `nd', keep(3) nogen;
-		replace assetsA = assetsA/1000000;
-		lab var assetsA "Assets ($ Mil)";
 		eststo firm_summ_`y':
-			estpost summ interlock_* banker_tot banker_unique
-							banker_indtop10_tot banker_indtop10_unique
-							same_ind_* horizontal_* v_possible_* vertical_*
-							no_relationship_* assetsA n_directors, d;
+			estpost summ interlocks_unique interlocks_tot
+							bnkints_unique bnkints_tot
+							bnkints_indtop10_unique bnkints_indtop10_tot
+							horizontal_unique horizontal_tot same_ind_unique same_ind_tot
+							vertical_unique vertical_tot v_possible_unique v_possible_tot
+							no_relationship_unique no_relationship_tot
+							unr_ind_unique unr_ind_tot assetsA n_directors, d;
 	restore;
 };
 
-lab var assetsA "Assets ($ Mil)";
 esttab firm_summ_* using "Thesis/Interlocks/firm_summs.csv", replace
 	cells("count mean(fmt(2)) sd(fmt(3)) min(fmt(2)) max(fmt(2))
 				p10(fmt(2)) p25(fmt(2)) p50(fmt(2)) p75(fmt(2)) p90(fmt(2))")
-	mtitles("1900" "1905" "1910" "1915" "1920") label;
+	mtitles("1895" "1900" "1905" "1910" "1915" "1920") label;
 
 #delimit cr
 *-------------------------------------------------------------------------------
 
-g byte overCA = (assetsA > 10000000/0.85 & assetsB > 10000000/0.85) if !inlist(., assetsA, assetsB)
+g byte overCA = (assetsA > 10/0.85 & assetsB > 10/0.85) if !inlist(., assetsA, assetsB)
 lab var overCA "Both firms over Clayton Act Threshold (baseline spec: $10m / 0.85)"
+
+drop if cidA > cidB // just keep one of each pair (order doesn't matter)
 gen assets_ratio = assetsA/assetsB
-		drop if assets_ratio < 1
-		drop if assetsA == . & assetsB != .
+	replace assets_ratio = 1/assets_ratio if assets_ratio < 1 
 	lab var assets_ratio "Ratio of Assets (Large/Small)"
+	
 forval y = 1915(5)1920 {
     * Sum of Assets
 	qui summ sum_assets if overCA & minyr < 1920, d
@@ -360,6 +376,7 @@ foreach var of varlist overCA* {
 	gen same_indX`var' = same_ind * `var'
 	gen v_possX`var' = v_possible * `var'
 }
+
 estimates clear
 /*
 forval y = 1910(5)1920 {
@@ -411,32 +428,32 @@ lab var ent_ent1915 "Entrant-Entrant (in 1915)"
 lab var L5inc_inc "Incumbent-Incument (5 years ago)"
 lab var L5inc_ent "Incumbent-Entrant (5 years ago)"
 lab var L5ent_ent "Entrant-Entrant (5 years ago)"
-
+/*
 #delimit ;
 local summs_varlist "same_ind v_possible L5inc_inc L5inc_ent L5ent_ent sum_entrants sum_assets";
 					
 forval y = 1900(5)1920 {;
 	eststo s_all_`y': estpost summ interlock banker banker_indtop10 `summs_varlist'
-								if year_std == `y' & minyr < 1920, d;
+								if year_std == `y' /*& minyr < 1920*/, d;
 
 	eststo s_notint_`y': estpost summ `summs_varlist'
-								if year_std == `y' & !interlock & minyr < 1920, d;
+								if year_std == `y' & !interlock /*& minyr < 1920*/, d;
 
 	eststo s_int_`y': estpost summ banker banker_indtop10 horizontal vertical no_relationship `summs_varlist'
-						if year_std == `y' & interlock & minyr < 1920, d;
+						if year_std == `y' & interlock /*& minyr < 1920*/, d;
 
 	eststo s_intbnk_`y': estpost summ horizontal vertical no_relationship `summs_varlist'
-						if year_std == `y' & interlock & banker & minyr < 1920, d;
+						if year_std == `y' & interlock & banker /*& minyr < 1920*/, d;
 
 	eststo s_intnotb_`y': estpost summ horizontal vertical no_relationship `summs_varlist'
-						if year_std == `y' & interlock & !banker & minyr < 1920, d;
+						if year_std == `y' & interlock & !banker /*& minyr < 1920*/, d;
 };
 
 esttab s_all_* using "Thesis/Interlocks/interlock_summs.csv", replace
 	cells("count mean(fmt(2)) sd(fmt(3)) min(fmt(2)) max(fmt(2))
 				p10(fmt(2)) p25(fmt(2)) p50(fmt(2)) p75(fmt(2)) p90(fmt(2))")
 	mtitles("1900" "1905" "1910" "1915" "1920") label note(" ")
-	title("Full Sample - Pairs Existing in 1915 & 1920 (w/ constant OverCA)");
+	title("Full Sample");
 esttab s_notint_* using "Thesis/Interlocks/interlock_summs.csv", append
 	cells("count mean(fmt(2)) sd(fmt(3)) min(fmt(2)) max(fmt(2))
 				p10(fmt(2)) p25(fmt(2)) p50(fmt(2)) p75(fmt(2)) p90(fmt(2))")
@@ -460,11 +477,11 @@ esttab s_intnotb_* using "Thesis/Interlocks/interlock_summs.csv", append
 	
 
 #delimit cr
-	
+	*/
 g byte h_X_overCA = horizontal * overCA
 g byte v_X_overCA = vertical * overCA
 
-foreach y in 1900 1905 1910 1915 1920 {
+foreach y in /*1900 1905 1910 1915*/ 1920 {
 g byte y`y' = year_std == `y'
 g byte overCA_X_`y' = y`y' * overCA
 g byte same_ind_X_`y' = same_ind * y`y'
@@ -476,7 +493,7 @@ g byte overCA_X_`y'_X_same_ind = same_ind * overCA * y`y'
 g byte overCA_X_`y'_X_vposs = v_possible * overCA * y`y'
 	g byte overCA_X_`y'_X_v = vertical * overCA * y`y'
 }
-
+/*
 foreach q in overCA_q1 overCA_q2 overCA_q3 overCA_q4 ///
 				overCA_rat1 overCA_rat2 overCA_rat3 overCA_rat4 {
 	g byte `q'_X_1920 = y1920 * `q'
@@ -487,11 +504,14 @@ foreach q in overCA_q1 overCA_q2 overCA_q3 overCA_q4 ///
 	g byte `q'_X_1920_X_vposs = same_ind * y1920 * `q'
 	g byte `q'_X_1920_X_v = same_ind * y1920 * `q'
 }
+*/
+
+xtset pairid year_std
 
 #delimit ;
 
 est clear;
-
+/*
 * Interlocks;
 eststo r1a1, title("Interlocks (Same-Ind Only)"):
 		reg interlock y1920 same_ind overCA
@@ -574,7 +594,7 @@ eststo ex3d, title("Banker (w/ V Possible) w/ Controls"):
 replace banker = . if interlock == 0;
 
 
-* Bankers conditional on interlock;
+/* Bankers conditional on interlock;
 eststo r4, title("Banker | Interlock"):
 		reg banker y1920 same_ind v_possible overCA
 		same_indXoverCA same_ind_X_1920 v_possXoverCA v_poss_X_1920 overCA_X_1920
@@ -594,6 +614,7 @@ eststo ex5, title("Banker | Interlock w/ Controls"):
 		same_indXoverCA same_ind_X_19?? v_possXoverCA v_poss_X_19?? overCA_X_19??
 		overCA_X_19??_X_same_ind overCA_X_19??_X_vposs
 		ln_sum_assets sum_entrants if interlock, vce(cluster pairid);
+*/
 
 esttab r* using "Thesis/Interlocks/interlock_regs.csv", replace mtitles
 	star(+ 0.10 * 0.05 ** 0.01 *** 0.001)
@@ -603,26 +624,45 @@ esttab r* using "Thesis/Interlocks/interlock_regs.csv", replace mtitles
 esttab ex* using "Thesis/Interlocks/interlock_regs_expanded.csv", replace mtitles
 	star(+ 0.10 * 0.05 ** 0.01 *** 0.001);
 est clear;
+*/
 
-/*
+replace interlock = 0 if interlock == .;
+replace banker = 0 if banker == .;
+replace banker_indtop10 = 0 if banker_indtop10 == .;
+
 xtset pairid year_std;
 
-forval yr = 1905(5)1920 {;
-	if `yr' == 1905 local abc "a";
-	if `yr' == 1910 local abc "b";
-	if `yr' == 1915 local abc "c";
-	if `yr' == 1920 local abc "d";
+est clear;
+eststo r1, title("Interlock     Panel"):
+		xtreg interlock overCA overCA_X_1920 same_ind_X_1920 overCA_X_1920_X_same_ind
+			, vce(cluster pairid) fe;
+eststo r2, title("Interlock     Panel"):
+		xtreg interlock overCA overCA_X_1920 same_ind_X_1920 overCA_X_1920_X_same_ind
+			ln_sum_assets assets_ratio, vce(cluster pairid) fe;
+esttab r1 r2 using "Thesis/Interlocks/interlock_regs_panel.csv", replace 
+	star(+ 0.10 * 0.05 ** 0.01 *** 0.001) se mtitles
+	order(overCA overCA_X_1920 same_ind_X_1920 overCA_X_1920_X_same_ind
+			ln_sum_assets assets_ratio);
+
+
+forval yr = 1900(5)1920 {;
+	if `yr' == 1900 local abc "a";
+	if `yr' == 1905 local abc "b";
+	if `yr' == 1910 local abc "c";
+	if `yr' == 1915 local abc "d";
+	if `yr' == 1920 local abc "e";
+	
 	eststo s1`abc', title("Interlock       `yr'"):
 			reg interlock same_ind v_possible ln_sum_assets assets_ratio
-				if year_std == `yr' /*& minyr < 1920*/, vce(cluster pairid);
+				if year_std == `yr', vce(cluster pairid);
 				
 	eststo s2`abc', title("Banker         (Orig. Top 10 Bankers)            `yr'"):
 			reg banker same_ind v_possible ln_sum_assets assets_ratio
-				if year_std == `yr' /*& minyr < 1920*/, vce(cluster pairid);
+				if year_std == `yr', vce(cluster pairid);
 
 	eststo s3`abc', title("Banker         (New Top 10 Ind Bankers)          `yr'"):
 			reg banker_indtop10 same_ind v_possible ln_sum_assets assets_ratio
-				if year_std == `yr' /*& minyr < 1920*/, vce(cluster pairid);
+				if year_std == `yr', vce(cluster pairid);
 	eststo s4`abc', title("Banker | Interlock         (Orig. Top 10 Bankers)            `yr'"):
 			reg banker same_ind v_possible ln_sum_assets assets_ratio
 				if year_std == `yr' & interlock /*& minyr < 1920*/, vce(cluster pairid);
@@ -631,11 +671,11 @@ forval yr = 1905(5)1920 {;
 			reg banker_indtop10 same_ind v_possible ln_sum_assets assets_ratio
 				if year_std == `yr' & interlock /*& minyr < 1920*/, vce(cluster pairid);
 };
-esttab s1* s2* s3* s4* s5* using "Thesis/Interlocks/simplified_interlock_regs.csv", replace 
+esttab s1* s2* s3* using "Thesis/Interlocks/simplified_interlock_regs.csv", replace 
 	star(+ 0.10 * 0.05 ** 0.01 *** 0.001) se mtitles
 	order(same_ind v_possible ln_sum_assets assets_ratio);
 			
-	*/			
+			
 #delimit cr
 sdf
 *%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
