@@ -9,7 +9,7 @@ forval ystart = 1895(5)1915 {
 	local y5 = `ystart' + 5
 	
 	*%%Prep Underwriter Dataset%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-	use year_std fullname_m cname using "UW_1880-1920_Indtop10.dta", clear
+	use year_std fullname_m cname using "Data/UW_1880-1920_Indtop10.dta", clear
 	*include clean_banknames.do
 	keep if year_std == `ystart'
 	duplicates drop
@@ -19,7 +19,7 @@ forval ystart = 1895(5)1915 {
 	tempfile temp10
 	save `temp10', replace
 
-	use year_std fullname_m cname using "UW_1880-1920_top25.dta", clear
+	use year_std fullname_m cname using "Data/UW_1880-1920_top25.dta", clear
 	*include clean_banknames.do
 	keep if year_std == `ystart'
 	duplicates drop
@@ -29,7 +29,7 @@ forval ystart = 1895(5)1915 {
 	tempfile temp25
 	save `temp25', replace
 
-	use year_std fullname_m cname using "UW_1880-1920_allnyse.dta", clear
+	use year_std fullname_m cname using "Data/UW_1880-1920_allnyse.dta", clear
 	*include clean_banknames.do
 	keep if year_std == `ystart'
 	duplicates drop
@@ -39,8 +39,17 @@ forval ystart = 1895(5)1915 {
 	tempfile tempNYSE
 	save `tempNYSE', replace
 	
+	
+	*%% Inds & Utils %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+	use year_std cname fullname_m director using "Thesis/Merges/Ind_boards_wtitles.dta", clear
+	append using "Thesis/Merges/Util_boards_final.dta", keep(year_std cname fullname_m director)
+	keep if director == 1
+	tempfile indutil
+	save `indutil', replace
+	
 	*%% Board Size %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-	use cname year_std fullname_m using "IndUtil_boards_final.dta", clear
+	use year_std cname fullname_m director using "Thesis/Merges/Ind_boards_wtitles.dta", clear
+	append using "Thesis/Merges/Util_boards_final.dta", keep(year_std cname fullname_m director)
 	assert fullname_m != ""
 	gen boardsize = 1
 	collapse (sum) boardsize, by(cname year_std)
@@ -48,7 +57,7 @@ forval ystart = 1895(5)1915 {
 	save `boardsizes', replace	
 	
 	*%% Prep Industry Datasets %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-	import excel cname cid Entrant Industry using "industrials_interlocks_coded.xlsx", ///
+	import excel cname cid Entrant Industry using "Data/industrials_interlocks_coded.xlsx", ///
 		clear sheet("`ystart'") cellrange(A2)
 	replace cname = "Natinoal Linseed Oil" if cname == "National Linseed Oil" ///
 				& `ystart' == 1895
@@ -59,12 +68,12 @@ forval ystart = 1895(5)1915 {
 
 	*%%Bankers on Boards%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 	//bankers by vertical industry groups
-	use year_std fullname_m cname using "UW_1880-1920_allnyse.dta", clear
+	use year_std fullname_m cname using "Data/UW_1880-1920_allnyse.dta", clear
 	keep if year_std == `ystart'
 	duplicates drop
 	rename cname bank_
 
-	joinby fullname_m year_std using "IndUtil_boards_final.dta", _merge(_m)
+	joinby fullname_m year_std using `indutil', _merge(_m)
 	keep bank_ fullname_m year_std cname
 	duplicates drop
 	
@@ -90,7 +99,7 @@ forval ystart = 1895(5)1915 {
 	bys fullname_m repeat: gen boardseats_num = _N
 	
 	bys fullname_m ind repeat: gen boardseats_sameind_num = _N
-		include boardseats_vertind_tally.do
+		include "$repo/boardseats_vertind_tally.do"
 		gen boardseats_nrind_num = boardseats_num - boardseats_sameind_num - boardseats_vertind_num
 		gen boardseats_sameind_ind = boardseats_sameind_num > 0
 		gen boardseats_vertind_ind = boardseats_vertind_num > 0
@@ -101,13 +110,13 @@ forval ystart = 1895(5)1915 {
 	tempfile banker_ind
 	save `banker_ind', replace
 	*---------------------------------------------------------------------------
-	use year_std fullname_m cname using "UW_1880-1920_allnyse.dta", clear
+	use year_std fullname_m cname using "Data/UW_1880-1920_allnyse.dta", clear
 	keep if year_std == `ystart'
 	duplicates drop
 	rename cname bank_
 
 	//bank-firm dataset
-	joinby fullname_m year_std using "IndUtil_boards_final.dta", _merge(_m)
+	joinby fullname_m year_std using "Data/IndUtil_boards_final.dta", _merge(_m)
 	keep bank_ fullname_m year_std cname
 	duplicates drop
 
@@ -125,7 +134,7 @@ forval ystart = 1895(5)1915 {
 	save `bank_ind', replace
 	
 	*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-	use "ind_banker_pairs`full'_`ystart'-`y5'.dta", clear
+	use "Data/ind_banker_pairs`full'_`ystart'-`y5'.dta", clear
 
 	gen year_std = `ystart'
 
@@ -200,7 +209,7 @@ forval ystart = 1895(5)1915 {
 		gen othbankers_sh = othbankers_num/boardsize
 		gen totbankers_sh = totbankers_num/boardsize
 		
-	merge m:1 cname year_std using "assets_ind.dta", keep(3) nogen
+	merge m:1 cname year_std using "Data/assets_ind.dta", keep(3) nogen
 		gen ln_assets = ln(assets)
 		gen assets_mn = assets/1000000
 		
@@ -235,20 +244,24 @@ forval ystart = 1895(5)1915 {
 		reg joinedboard rank_1_10 ib(first).ind_cat ln_assets
 						boardseats_sameind_num boardseats_vertind_num
 						totbankers_sh boardsize, vce(cluster firmid);
+		estadd ysumm, mean;
 	eststo r2`abc'`full', title("`ystart'-`y5'"):
 		reg joinedboard rank_1_10 ib(first).ind_cat ln_assets
 						boardseats_sameind_num boardseats_vertind_num
 						ownbankers_sh othbankers_sh boardsize, vce(cluster firmid);
+		estadd ysumm, mean;
 	eststo r3`abc'`full', title("`ystart'-`y5'"):
 		reg joinedboard rank_1_10 ib(first).ind_cat ln_assets
 						boardseats_sameind_num boardseats_sameind_num2
 						boardseats_vertind_num boardseats_vertind_num2
 						totbankers_sh boardsize, vce(cluster firmid);
+		estadd ysumm, mean;
 	eststo r4`abc'`full', title("`ystart'-`y5'"):
 		reg joinedboard rank_1_10 ib(first).ind_cat ln_assets
 						boardseats_sameind_num boardseats_sameind_num2
 						boardseats_vertind_num boardseats_vertind_num2
 						ownbankers_sh othbankers_sh boardsize, vce(cluster firmid);
+		estadd ysumm, mean;
 	#delimit cr
 }
 }
@@ -256,6 +269,7 @@ forval ystart = 1895(5)1915 {
 esttab r1? r2? r3? r4? r1?_fullset r2?_fullset r3?_fullset r4?_fullset
 	using "Ind-banker_pair_regs.csv", replace
 	star(+ 0.10 * 0.05 ** 0.01 *** 0.001) se mtitles label
+	scalars("ymean Mean(Dep. Var.)") addnotes("SEs clustered on firmid")
 	order(rank_1_10 boardseats_sameind_num boardseats_vertind_num
 			boardseats_sameind_num2 boardseats_vertind_num2 totbankers_sh
 			ownbankers_sh othbankers_sh boardsize ln_assets);
@@ -316,21 +330,25 @@ foreach full in "" "_fullset" {
 			boardseats_sameind_num* boardseats_vertind_num*
 			totbankers_sh*
 			boardsize* ln_assets* i.firmid, vce(cluster firmid);
+		estadd ysumm, mean;
 	eststo r2`full', title("Firm Dummies"):
 		reg joinedboard yr19* rank_1_10*
 			boardseats_sameind_num* boardseats_vertind_num*
 			ownbankers_sh* othbankers_sh*
 			boardsize* ln_assets* i.firmid, vce(cluster firmid);
+		estadd ysumm, mean;
 	egen pairid = group(cname fullname_m);
 	xtset pairid year_std;
 	eststo r1`full'_fe, title("Firm-Banker Pair FEs"):
 		xtreg joinedboard yr19* rank_1_10*
 			boardseats_sameind_num* boardseats_vertind_num*
-			totbankers_sh* boardsize* ln_assets*, fe vce(robust);
+			totbankers_sh* boardsize* ln_assets*, fe vce(cluster firmid);
+		estadd ysumm, mean;
 	eststo r2`full'_fe, title("Firm-Banker Pair FEs"):
 		xtreg joinedboard yr19* rank_1_10*
 			boardseats_sameind_num* boardseats_vertind_num*
-			ownbankers_sh* othbankers_sh* boardsize* ln_assets*, fe vce(robust);
+			ownbankers_sh* othbankers_sh* boardsize* ln_assets*, fe vce(cluster firmid);
+		estadd ysumm, mean;
 	#delimit cr
 }
 
@@ -338,6 +356,7 @@ foreach full in "" "_fullset" {
 esttab r1 r2 r1_fe r2_fe r1_fullset r2_fullset r1_fullset_fe r2_fullset_fe
 	using "Ind-banker_pair_regs_timeints.csv", replace
 	star(+ 0.10 * 0.05 ** 0.01 *** 0.001) se mtitles drop(*firmid)
+	scalars("ymean Mean(Dep. Var.)") addnotes("SEs clustered on firmid")
 	order(yr19* rank_1_10*
 			boardseats_sameind_num boardseats_sameind_num_*
 			boardseats_sameind_num2* boardseats_vertind_num

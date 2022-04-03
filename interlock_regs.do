@@ -287,8 +287,12 @@ gen no_relationship_tot = no_relationship * interlocks_tot
 gen no_relationship_unique = no_relationship
 gen v_possible_tot = v_possible * interlocks_tot
 gen v_possible_unique = v_possible * interlock
+gen v_possible_bnkr_tot = v_possible * bnkints_tot
+gen v_possible_bnkr_unique = v_possible * banker
 gen same_ind_tot = same_ind * interlocks_tot
 gen same_ind_unique = same_ind * interlock
+gen same_ind_bnkr_tot = same_ind * bnkints_tot
+gen same_ind_bnkr_unique = same_ind * banker
 gen unr_ind_tot = unr_ind * interlocks_tot
 gen unr_ind_unique = unr_ind * interlock
 		
@@ -313,7 +317,9 @@ forval y = 1895(5)1920 {;
 							bnkints_unique bnkints_tot
 							bnkints_indtop10_unique bnkints_indtop10_tot
 							horizontal_unique horizontal_tot same_ind_unique same_ind_tot
+							same_ind_bnkr_unique same_ind_bnkr_tot
 							vertical_unique vertical_tot v_possible_unique v_possible_tot
+							v_possible_bnkr_unique v_possible_bnkr_tot
 							no_relationship_unique no_relationship_tot
 							unr_ind_unique unr_ind_tot assetsA n_directors, d;
 	restore;
@@ -327,7 +333,7 @@ esttab firm_summ_* using "Thesis/Interlocks/firm_summs.csv", replace
 #delimit cr
 *-------------------------------------------------------------------------------
 
-g byte overCA = (assetsA > 10/0.85 & assetsB > 10/0.85) if !inlist(., assetsA, assetsB)
+g byte overCA = (assetsA > 10/0.85 | assetsB > 10/0.85) if !inlist(., assetsA, assetsB)
 lab var overCA "Both firms over Clayton Act Threshold (baseline spec: $10m / 0.85)"
 
 drop if cidA > cidB // just keep one of each pair (order doesn't matter)
@@ -335,85 +341,8 @@ gen assets_ratio = assetsA/assetsB
 	replace assets_ratio = 1/assets_ratio if assets_ratio < 1 
 	lab var assets_ratio "Ratio of Assets (Large/Small)"
 	
-forval y = 1915(5)1920 {
-    * Sum of Assets
-	qui summ sum_assets if overCA & minyr < 1920, d
-		if `y' == 1915 g byte overCA_q1 = (sum_assets < `r(p25)') & overCA if year_std == `y'
-		if `y' == 1920 replace overCA_q1 = (sum_assets < `r(p25)') & overCA if year_std == `y'
-	qui summ sum_assets if overCA & minyr < 1920, d
-		if `y' == 1915 g byte overCA_q2 = (sum_assets >= `r(p25)') & (sum_assets < `r(p50)') & overCA ///
-			if year_std == `y'
-		if `y' == 1920 replace overCA_q2 = (sum_assets >= `r(p25)') & (sum_assets < `r(p50)') & overCA ///
-			if year_std == `y'
-	qui summ sum_assets if overCA & minyr < 1920, d
-		if `y' == 1915 g byte overCA_q3 = (sum_assets >= `r(p50)') & (sum_assets < `r(p75)') & overCA ///
-			if year_std == `y'
-		if `y' == 1920 replace overCA_q3 = (sum_assets >= `r(p50)') & (sum_assets < `r(p75)') & overCA ///
-			if year_std == `y'
-	qui summ sum_assets if overCA & minyr < 1920, d
-		if `y' == 1915 g byte overCA_q4 = (sum_assets >= `r(p75)') & overCA if year_std == `y'
-		if `y' == 1920 replace overCA_q4 = (sum_assets >= `r(p75)') & overCA if year_std == `y'
-		
-	*Size Ratio of Large Firm to Small Firms
-	qui summ assets_ratio if overCA & minyr < 1920, d
-		if `y' == 1915 g byte overCA_rat1 = (assets_ratio < `r(p25)') & overCA if year_std == `y'
-		if `y' == 1920 replace overCA_rat1 = (assets_ratio < `r(p25)') & overCA if year_std == `y'
-	qui summ assets_ratio if overCA & minyr < 1920, d
-		if `y' == 1915 g byte overCA_rat2 = (assets_ratio >= `r(p25)') & (assets_ratio < `r(p50)') & overCA ///
-			if year_std == `y'
-		if `y' == 1920 replace overCA_rat2 = (assets_ratio >= `r(p25)') & (assets_ratio < `r(p50)') & overCA ///
-			if year_std == `y'
-	qui summ assets_ratio if overCA & minyr < 1920, d
-		if `y' == 1915 g byte overCA_rat3 = (assets_ratio >= `r(p50)') & (assets_ratio < `r(p75)') & overCA ///
-			if year_std == `y'
-		if `y' == 1920 replace overCA_rat3 = (assets_ratio >= `r(p50)') & (assets_ratio < `r(p75)') & overCA ///
-			if year_std == `y'
-	qui summ assets_ratio if overCA & minyr < 1920, d
-		if `y' == 1915 g byte overCA_rat4 = (assets_ratio >= `r(p75)') & overCA if year_std == `y'
-		if `y' == 1920 replace overCA_rat4 = (assets_ratio >= `r(p75)') & overCA if year_std == `y'
-}
-foreach var of varlist overCA* {
-	gen same_indX`var' = same_ind * `var'
-	gen v_possX`var' = v_possible * `var'
-}
-
-estimates clear
-/*
-forval y = 1910(5)1920 {
-	eststo r`y'a: reg interlock same_ind v_possible if year_std == `y', vce(r)
-	eststo r`y'b: reg interlock same_ind v_possible over10m same_indXover10m v_possXover10m ///
-				if year_std == `y', vce(r)
-	eststo r`y'c: reg interlock same_ind v_possible over10m same_indXover10m v_possXover10m ///
-				inc_inc inc_ent sum_entrants if year_std == `y', vce(r)
-	eststo r`y'd: reg interlock same_ind v_possible over10m same_indXover10m v_possXover10m ///
-				inc_inc inc_ent sum_entrants ln_sum_assets if year_std == `y', vce(r)
-}
-
-esttab r1910? r1915? r1920? using "Thesis/Interlocks/interlock_regs.csv", replace
-
-
-forval y = 1910(5)1920 {
-	eststo l`y'a: logit interlock same_ind v_possible if year_std == `y', vce(r)
-	eststo l`y'b: logit interlock same_ind v_possible over10m same_indXover10m v_possXover10m ///
-				if year_std == `y', vce(r)
-	eststo l`y'c: logit interlock same_ind v_possible over10m same_indXover10m v_possXover10m ///
-				 inc_inc inc_ent sum_entrants if year_std == `y', vce(r)
-}
-
-esttab l1910? l1915? l1920? using "Thesis/Interlocks/interlock_logits.csv", replace eform
-
-*/
-
 est clear
-
-
-*keep if overCA != .
-*keep if (year_std == 1920 & overCA == l5.overCA) ///
-		| (year_std == 1915 & overCA == f5.overCA) ///
-		| (year_std == 1910 & overCA == f10.overCA) ///
-		| (year_std == 1905 & overCA == f15.overCA) ///
-		| (year_std == 1900 & overCA == f20.overCA)
-		
+	
 
 lab var same_ind "Same Industry"
 lab var v_possible "Potential Vertical Relationship"
@@ -478,153 +407,19 @@ esttab s_intnotb_* using "Thesis/Interlocks/interlock_summs.csv", append
 
 #delimit cr
 	*/
-g byte h_X_overCA = horizontal * overCA
-g byte v_X_overCA = vertical * overCA
-
 foreach y in /*1900 1905 1910 1915*/ 1920 {
 g byte y`y' = year_std == `y'
 g byte overCA_X_`y' = y`y' * overCA
 g byte same_ind_X_`y' = same_ind * y`y'
-	g byte h_X_`y' = horizontal * y`y'
-g byte v_poss_X_`y' = y`y' * v_possible
-	g byte v_X_`y' = y`y' * vertical
+g byte v_possible_X_`y' = v_possible * y`y'
 g byte overCA_X_`y'_X_same_ind = same_ind * overCA * y`y'
-	g byte overCA_X_`y'_X_h = horizontal * overCA * y`y'
-g byte overCA_X_`y'_X_vposs = v_possible * overCA * y`y'
-	g byte overCA_X_`y'_X_v = vertical * overCA * y`y'
 }
-/*
-foreach q in overCA_q1 overCA_q2 overCA_q3 overCA_q4 ///
-				overCA_rat1 overCA_rat2 overCA_rat3 overCA_rat4 {
-	g byte `q'_X_1920 = y1920 * `q'
-	g byte h_X_`q' = horizontal * `q'
-	g byte v_X_`q' = vertical * `q'
-	g byte `q'_X_1920_X_same_ind = same_ind * y1920 * `q'
-	g byte `q'_X_1920_X_h = same_ind * y1920 * `q'
-	g byte `q'_X_1920_X_vposs = same_ind * y1920 * `q'
-	g byte `q'_X_1920_X_v = same_ind * y1920 * `q'
-}
-*/
 
 xtset pairid year_std
 
 #delimit ;
 
 est clear;
-/*
-* Interlocks;
-eststo r1a1, title("Interlocks (Same-Ind Only)"):
-		reg interlock y1920 same_ind overCA
-		same_indXoverCA same_ind_X_1920 overCA_X_1920
-		overCA_X_1920_X_same_ind, vce(cluster pairid);
-eststo ex1a, title("Interlocks (Same-Ind Only)"):
-		reg interlock y19?? same_ind overCA
-		same_indXoverCA same_ind_X_19?? overCA_X_19??
-		overCA_X_19??_X_same_ind, vce(cluster pairid);
-eststo r1b1, title("Interlocks (w/ V Possible)"):
-		reg interlock y1920 same_ind v_possible overCA
-		same_indXoverCA same_ind_X_1920 v_possXoverCA v_poss_X_1920 overCA_X_1920
-		overCA_X_1920_X_same_ind overCA_X_1920_X_vposs, vce(cluster pairid);
-eststo ex1b, title("Interlocks (w/ V Possible)"):
-		reg interlock y19?? same_ind v_possible overCA
-		same_indXoverCA same_ind_X_19?? v_possXoverCA v_poss_X_19?? overCA_X_19??
-		overCA_X_19??_X_same_ind overCA_X_19??_X_vposs, vce(cluster pairid);
-		
-eststo r2a1, title("Interlocks (Same-Ind Only) w/ Controls"):
-		reg interlock y1920 same_ind overCA
-		same_indXoverCA same_ind_X_1920 overCA_X_1920
-		overCA_X_1920_X_same_ind
-		/*L5inc_inc L5inc_ent*/ ln_sum_assets sum_entrants, vce(cluster pairid);
-eststo ex2a, title("Interlocks (Same-Ind Only) w/ Controls"):
-		reg interlock y19?? same_ind overCA
-		same_indXoverCA same_ind_X_19?? overCA_X_19??
-		overCA_X_19??_X_same_ind
-		ln_sum_assets sum_entrants, vce(cluster pairid);
-eststo r2b1, title("Interlocks (w/ V Possible) w/ Controls"):
-		reg interlock y1920 same_ind v_possible overCA
-		same_indXoverCA same_ind_X_1920 v_possXoverCA v_poss_X_1920 overCA_X_1920
-		overCA_X_1920_X_same_ind overCA_X_1920_X_vposs
-		ln_sum_assets sum_entrants, vce(cluster pairid);
-eststo ex2b, title("Interlocks (w/ V Possible) w/ Controls"):
-		reg interlock y19?? same_ind v_possible overCA
-		same_indXoverCA same_ind_X_19?? v_possXoverCA v_poss_X_19?? overCA_X_19??
-		overCA_X_19??_X_same_ind overCA_X_19??_X_vposs
-		ln_sum_assets sum_entrants, vce(cluster pairid);
-		
-* Bankers;
-replace banker = 0 if banker == .;
-eststo r3a, title("Banker (Same-Ind Only)"):
-		reg banker y1920 same_ind overCA
-		same_indXoverCA same_ind_X_1920 overCA_X_1920
-		overCA_X_1920_X_same_ind, vce(cluster pairid);
-eststo r3b, title("Banker (w/ V Possible)"):
-		reg banker y1920 same_ind v_possible overCA
-		same_indXoverCA same_ind_X_1920 v_possXoverCA v_poss_X_1920 overCA_X_1920
-		overCA_X_1920_X_same_ind overCA_X_1920_X_vposs, vce(cluster pairid);
-eststo r3c, title("Banker (Same-Ind Only) w/ Controls"):
-		reg banker y1920 same_ind overCA
-		same_indXoverCA same_ind_X_1920 overCA_X_1920
-		overCA_X_1920_X_same_ind
-		ln_sum_assets sum_entrants, vce(cluster pairid);
-eststo r3d, title("Banker (w/ V Possible) w/ Controls"):
-		reg banker y1920 same_ind v_possible overCA
-		same_indXoverCA same_ind_X_1920 v_possXoverCA v_poss_X_1920 overCA_X_1920
-		overCA_X_1920_X_same_ind overCA_X_1920_X_vposs
-		ln_sum_assets sum_entrants, vce(cluster pairid);
-		
-*                  including all year dummies and interactions;
-eststo ex3a, title("Banker (Same-Ind Only)"):
-		reg banker y19?? same_ind overCA
-		same_indXoverCA same_ind_X_19?? overCA_X_19??
-		overCA_X_19??_X_same_ind, vce(cluster pairid);
-eststo ex3b, title("Banker (w/ V Possible)"):
-		reg banker y19?? same_ind v_possible overCA
-		same_indXoverCA same_ind_X_19?? v_possXoverCA v_poss_X_19?? overCA_X_19??
-		overCA_X_19??_X_same_ind overCA_X_19??_X_vposs, vce(cluster pairid);
-eststo ex3c, title("Banker (Same-Ind Only) w/ Controls"):
-		reg banker y19?? same_ind overCA
-		same_indXoverCA same_ind_X_19?? overCA_X_19??
-		overCA_X_19??_X_same_ind
-		ln_sum_assets sum_entrants, vce(cluster pairid);
-eststo ex3d, title("Banker (w/ V Possible) w/ Controls"):
-		reg banker y19?? same_ind v_possible overCA
-		same_indXoverCA same_ind_X_19?? v_possXoverCA v_poss_X_19?? overCA_X_19??
-		overCA_X_19??_X_same_ind overCA_X_19??_X_vposs
-		ln_sum_assets sum_entrants, vce(cluster pairid);
-replace banker = . if interlock == 0;
-
-
-/* Bankers conditional on interlock;
-eststo r4, title("Banker | Interlock"):
-		reg banker y1920 same_ind v_possible overCA
-		same_indXoverCA same_ind_X_1920 v_possXoverCA v_poss_X_1920 overCA_X_1920
-		overCA_X_1920_X_same_ind overCA_X_1920_X_vposs if interlock, vce(cluster pairid);
-eststo ex4, title("Banker | Interlock"):
-		reg banker y19?? same_ind v_possible overCA
-		same_indXoverCA same_ind_X_19?? v_possXoverCA v_poss_X_19?? overCA_X_1920
-		overCA_X_19??_X_same_ind overCA_X_19??_X_vposs if interlock, vce(cluster pairid);
-		
-eststo r5, title("Banker | Interlock w/ Controls"):
-		reg banker y1920 same_ind v_possible overCA
-		same_indXoverCA same_ind_X_1920 v_possXoverCA v_poss_X_1920 overCA_X_1920
-		overCA_X_1920_X_same_ind overCA_X_1920_X_vposs
-		ln_sum_assets sum_entrants if interlock, vce(cluster pairid);
-eststo ex5, title("Banker | Interlock w/ Controls"):
-		reg banker y19?? same_ind v_possible overCA
-		same_indXoverCA same_ind_X_19?? v_possXoverCA v_poss_X_19?? overCA_X_19??
-		overCA_X_19??_X_same_ind overCA_X_19??_X_vposs
-		ln_sum_assets sum_entrants if interlock, vce(cluster pairid);
-*/
-
-esttab r* using "Thesis/Interlocks/interlock_regs.csv", replace mtitles
-	star(+ 0.10 * 0.05 ** 0.01 *** 0.001)
-	order(y1920 overCA same_ind v_possible /*horizontal vertical no_relationship*/
-			overCA_X_1920_X_same_ind overCA_X_1920_X_vposs);
-			
-esttab ex* using "Thesis/Interlocks/interlock_regs_expanded.csv", replace mtitles
-	star(+ 0.10 * 0.05 ** 0.01 *** 0.001);
-est clear;
-*/
 
 replace interlock = 0 if interlock == .;
 replace banker = 0 if banker == .;
@@ -633,16 +428,35 @@ replace banker_indtop10 = 0 if banker_indtop10 == .;
 xtset pairid year_std;
 
 est clear;
-eststo r1, title("Interlock     Panel"):
+eststo r1, title("Clayton Act     Panel     Interlocks"):
 		xtreg interlock overCA overCA_X_1920 same_ind_X_1920 overCA_X_1920_X_same_ind
 			, vce(cluster pairid) fe;
-eststo r2, title("Interlock     Panel"):
+		estadd ysumm, mean;
+eststo r2, title("Clayton Act     Panel     Interlocks"):
 		xtreg interlock overCA overCA_X_1920 same_ind_X_1920 overCA_X_1920_X_same_ind
 			ln_sum_assets assets_ratio, vce(cluster pairid) fe;
-esttab r1 r2 using "Thesis/Interlocks/interlock_regs_panel.csv", replace 
-	star(+ 0.10 * 0.05 ** 0.01 *** 0.001) se mtitles
-	order(overCA overCA_X_1920 same_ind_X_1920 overCA_X_1920_X_same_ind
-			ln_sum_assets assets_ratio);
+		estadd ysumm, mean;
+eststo r3, title("Clayton Act     Panel     Interlocks"):
+		xtreg interlock overCA overCA_X_1920 same_ind_X_1920 v_possible_X_1920
+			overCA_X_1920_X_same_ind ln_sum_assets assets_ratio, vce(cluster pairid) fe;
+		estadd ysumm, mean;
+eststo r4, title("Clayton Act     Panel     Bankers"):
+		xtreg banker overCA overCA_X_1920 same_ind_X_1920 overCA_X_1920_X_same_ind
+			, vce(cluster pairid) fe;
+		estadd ysumm, mean;
+eststo r5, title("Clayton Act     Panel     Bankers"):
+		xtreg banker overCA overCA_X_1920 same_ind_X_1920 overCA_X_1920_X_same_ind
+			ln_sum_assets assets_ratio, vce(cluster pairid) fe;
+		estadd ysumm, mean;
+eststo r6, title("Clayton Act     Panel     Bankers"):
+		xtreg banker overCA overCA_X_1920 same_ind_X_1920 v_possible_X_1920
+			overCA_X_1920_X_same_ind ln_sum_assets assets_ratio, vce(cluster pairid) fe;
+		estadd ysumm, mean;
+esttab r? using "Thesis/Interlocks/interlock_regs_ca_panel.csv", replace 
+	star(+ 0.10 * 0.05 ** 0.01 *** 0.001) se mtitles scalars("ymean Mean of D.V.")
+	order(overCA overCA_X_1920 same_ind_X_1920 v_possible_X_1920 overCA_X_1920_X_same_ind
+			ln_sum_assets assets_ratio)
+	addnotes("SEs clustered on pairid");
 
 
 forval yr = 1900(5)1920 {;
@@ -654,26 +468,32 @@ forval yr = 1900(5)1920 {;
 	
 	eststo s1`abc', title("Interlock       `yr'"):
 			reg interlock same_ind v_possible ln_sum_assets assets_ratio
-				if year_std == `yr', vce(cluster pairid);
+				if year_std == `yr', vce(robust);
+		estadd ysumm, mean;
 				
 	eststo s2`abc', title("Banker         (Orig. Top 10 Bankers)            `yr'"):
 			reg banker same_ind v_possible ln_sum_assets assets_ratio
-				if year_std == `yr', vce(cluster pairid);
+				if year_std == `yr', vce(robust);
+		estadd ysumm, mean;
 
 	eststo s3`abc', title("Banker         (New Top 10 Ind Bankers)          `yr'"):
 			reg banker_indtop10 same_ind v_possible ln_sum_assets assets_ratio
-				if year_std == `yr', vce(cluster pairid);
+				if year_std == `yr', vce(robust);
+		estadd ysumm, mean;
 	eststo s4`abc', title("Banker | Interlock         (Orig. Top 10 Bankers)            `yr'"):
 			reg banker same_ind v_possible ln_sum_assets assets_ratio
-				if year_std == `yr' & interlock /*& minyr < 1920*/, vce(cluster pairid);
+				if year_std == `yr' & interlock /*& minyr < 1920*/, vce(robust);
+		estadd ysumm, mean;
 
 	eststo s5`abc', title("Banker | Interlock         (New Top 10 Ind Bankers)          `yr'"):
 			reg banker_indtop10 same_ind v_possible ln_sum_assets assets_ratio
-				if year_std == `yr' & interlock /*& minyr < 1920*/, vce(cluster pairid);
+				if year_std == `yr' & interlock /*& minyr < 1920*/, vce(robust);
+		estadd ysumm, mean;
 };
-esttab s1* s2* s3* using "Thesis/Interlocks/simplified_interlock_regs.csv", replace 
-	star(+ 0.10 * 0.05 ** 0.01 *** 0.001) se mtitles
-	order(same_ind v_possible ln_sum_assets assets_ratio);
+esttab s1* s2* s3* using "Thesis/Interlocks/interlock_regs_byyr.csv", replace 
+	star(+ 0.10 * 0.05 ** 0.01 *** 0.001) se mtitles scalars("ymean Mean(Dep. Var.)")
+	order(same_ind v_possible ln_sum_assets assets_ratio)
+	addnotes("Robust SEs");
 			
 			
 #delimit cr

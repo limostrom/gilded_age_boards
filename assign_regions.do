@@ -83,7 +83,8 @@ replace region = "N" if inlist(cname, "Cleveland & Pitts", ///
 								"CLEVELAND & PITTSBURGH", "Cleve & Pitts" ///
 								"Cleveland and Pittsburgh", ///
 								"Cleveland and Pittsburgh Railroad", ///
-								"CLEVELAND & PITTSBURGH RAILROAD CO.")
+								"CLEVELAND & PITTSBURGH RAILROAD CO.", ///
+								"Cleveland and Pittsburgh")
 replace region = "W" if cname == "Colorado & Southern"
 replace region = "W" if inlist(cname, "Colorado Midland", "Col. Mid.")
 replace region = "S" if cname == "COLUMBIA & GREENVILLE"

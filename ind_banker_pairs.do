@@ -17,11 +17,12 @@ save `temp_uw', replace
 
 if `fullset' == 0 {
 	*%%Load Railroad Dataset%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-	use year_std cname fullname_m director using "IndUtil_boards_final.dta", clear
+	use year_std cname fullname_m director using "Ind_boards_wtitles.dta", clear
+	append using "Util_boards_final.dta", keepus(year_std cname fullname_m director)
 	keep if director == 1
 	drop director
 
-	*Identify bankers ever on a RR board 1890-1910
+	*Identify bankers ever on an indstrial board 1890-1910
 	joinby year_std fullname_m using `temp_uw', unm(none) _merge(m_uws)
 	keep fullname_m
 	duplicates drop
@@ -32,8 +33,9 @@ if `fullset' == 0 {
 forval ystart = 1895(5)1915 {
 	local y5 = `ystart' + 5
 	
-	*Keep RRs that were there in 1900
-	use year_std cname fullname_m director using "IndUtil_boards_final.dta", clear
+	*Keep firms that were there in 1900
+	use year_std cname fullname_m director using "Ind_boards_wtitles.dta", clear
+	append using "Util_boards_final.dta", keepus(year_std cname fullname_m director)
 	keep if director == 1
 	drop director
 	keep if year_std == `ystart'
@@ -57,7 +59,8 @@ forval ystart = 1895(5)1915 {
 	save `all_pairs', replace
 
 	*%%Generate Actual Dataset%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-	use year_std cname fullname_m director using "IndUtil_boards_final.dta", clear
+	use year_std cname fullname_m director using "Ind_boards_wtitles.dta", clear
+	append using "Util_boards_final.dta", keepus(year_std cname fullname_m director)
 	keep if director == 1
 	drop director
 	keep if inlist(year_std, `ystart', `y5')

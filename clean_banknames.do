@@ -3,7 +3,7 @@ clean_banknames.do
 
 */
 
-gen bankname_stn = upper(cname)
+gen bankname_stn = upper(bank_)
 replace bankname_stn = subinstr(bankname_stn, ".", "", .)
 replace bankname_stn = subinstr(bankname_stn, ",", "", .)
 replace bankname_stn = "BLAIR & CO" if bankname_stn == "BLAIR & CO INC"

@@ -6,8 +6,10 @@ pause on
 
 est clear
 
+global repo "C:\Users\17036\OneDrive\Documents\GitHub\gilded_age_boards"
+cap cd "C:\Users\17036\Dropbox\Personal Document Backup\Gilded Age Boards - Scratch\"
 
-import excel "1900 RR Financial Data.xlsx", first clear
+import excel "Data/1900 RR Financial Data.xlsx", first clear
 replace bills = 0 if bills == .
 tempfile rrfin
 save `rrfin', replace
@@ -17,38 +19,47 @@ forval ystart = 1895(5)1915 {
 	local y5 = `ystart' + 5
 	
 	*%%Prep Underwriter Dataset%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-	use year_std fullname_m cname using "UW_1880-1920_top10.dta", clear
-	include clean_banknames.do
+	use year_std fullname_m cname using "Data/UW_1880-1920_top10.dta", clear
+	ren cname bank_
+	include $repo/clean_banknames.do
 	keep if year_std == `ystart'
 	duplicates drop
-	rename cname bank10_
+	rename bank_ bank10_
 	bys fullname_m year_std: gen n = _n
+	replace bank10_ = bankname_stn
+	drop bankname_stn
 	reshape wide bank10_, i(fullname_m year_std) j(n)
 	tempfile temp10
 	save `temp10', replace
 
-	use year_std fullname_m cname using "UW_1880-1920_top25.dta", clear
-	include clean_banknames.do
+	use year_std fullname_m cname using "Data/UW_1880-1920_top25.dta", clear
+	ren cname bank_
+	include $repo/clean_banknames.do
 	keep if year_std == `ystart'
 	duplicates drop
-	rename cname bank25_
+	rename bank_ bank25_
 	bys fullname_m year_std: gen n = _n
+	replace bank25_ = bankname_stn
+	drop bankname_stn
 	reshape wide bank25_, i(fullname_m year_std) j(n)
 	tempfile temp25
 	save `temp25', replace
 
-	use year_std fullname_m cname using "UW_1880-1920_allnyse.dta", clear
-	include clean_banknames.do
+	use year_std fullname_m cname using "Data/UW_1880-1920_allnyse.dta", clear
+	ren cname bank_
+	include "$repo/clean_banknames.do"
 	keep if year_std == `ystart'
 	duplicates drop
-	rename cname bankAll_
+	rename bank_ bankAll_
 	bys fullname_m year_std: gen n = _n
+	replace bankAll_ = bankname_stn
+	drop bankname_stn
 	reshape wide bankAll_, i(fullname_m year_std) j(n)
 	tempfile tempNYSE
 	save `tempNYSE', replace
 
 	*%%Board Size%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-	use year_std fullname_m cname using "Railroad_boards_final.dta", clear
+	use year_std fullname_m cname using "Data/Railroad_boards_final.dta", clear
 	assert fullname_m != ""
 	gen boardsize = 1
 	collapse (sum) boardsize, by(cname year_std)
@@ -56,28 +67,30 @@ forval ystart = 1895(5)1915 {
 	save `boardsizes', replace
 	
 	*%%Receivership%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-	import excel "Receivership variable.xlsx", clear first
+	import excel "Data/Receivership variable.xlsx", clear first
 	drop if cname == "" & year_std == .
 	isid cname year_std
-	include harmonize_rr_names.do
+	include "$repo/harmonize_rr_names.do"
 	drop if year_std == 1890 & cname == "KEOKUK AND DES MOINES RAILROAD"
 	replace receivership = 0 if receivership == .
 	replace sub_receivership = 0 if sub_receivership == .
+	duplicates tag cname_stn year_std, gen(dup)
+	bys cname_stn year_std: ereplace receivership = max(receivership)
+	duplicates drop cname_stn year_std, force
 	tempfile receivership
 	save `receivership', replace
 	
 	*%%Bankers on Boards%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-	use year_std fullname_m cname using "UW_1880-1920_allnyse.dta", clear
+	use year_std fullname_m cname using "Data/UW_1880-1920_allnyse.dta", clear
 	keep if year_std == `ystart'
 	duplicates drop
 	rename cname bank_
 
-	joinby fullname_m year_std using "Railroad_boards_final.dta", _merge(_m)
+	joinby fullname_m year_std using "Data/Railroad_boards_final.dta", _merge(_m)
 	keep bank_ fullname_m year_std cname
 	duplicates drop
 
-	include assign_regions.do
-
+	include "$repo/assign_regions.do"
 	bys fullname_m cname (bank_): gen repeat = _n - 1
 	bys fullname_m repeat: gen boardseats_num = _N
 
@@ -91,32 +104,34 @@ forval ystart = 1895(5)1915 {
 	tempfile banker_reg
 	save `banker_reg', replace
 	*---------------------------------------------------------------------------
-	use year_std fullname_m cname using "UW_1880-1920_allnyse.dta", clear
+	use year_std fullname_m cname using "Data/UW_1880-1920_allnyse.dta", clear
 	keep if year_std == `ystart'
 	duplicates drop
 	rename cname bank_
 
-	joinby fullname_m year_std using "Railroad_boards_final.dta", _merge(_m)
+	joinby fullname_m year_std using "Data/Railroad_boards_final.dta", _merge(_m)
 	keep bank_ fullname_m year_std cname
+	include "$repo/clean_banknames.do"
 	duplicates drop
 
-	include assign_regions.do
+	include "$repo/assign_regions.do"
 	
-	bys bank_ cname: gen ownbankers_num = _N
+	bys bankname_stn cname: gen ownbankers_num = _N
 		gen ownbankers_ind = ownbankers_num > 0
 	egen tag_banker = tag(cname fullname_m)
 	bys cname: egen totbankers_num = total(tag_banker)
 		gen othbankers_num = totbankers_num - ownbankers_num
 		gen othbankers_ind = othbankers_num > 0
-	sort bank cname
-	keep bank cname ???bankers_*
+	sort bankname_stn cname
+	keep bankname_stn cname ???bankers_*
+	
 	duplicates drop
 	isid bank cname
 	tempfile bank_rr
 	save `bank_rr', replace
 
 	*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-	use "rr_banker_pairs`full'_`ystart'-`y5'.dta", clear
+	use "Data/rr_banker_pairs`full'_`ystart'-`y5'.dta", clear
 
 	gen year_std = `ystart'
 
@@ -145,21 +160,25 @@ forval ystart = 1895(5)1915 {
 			replace `bankname' = "" if inlist(`bankname', bank10_1, bank25_1, bank25_2)
 	}
 
-	include assign_regions.do
+	
+	include "$repo/assign_regions.do"
 	gen regN = region == "N"
 	gen regS = region == "S"
 	gen regW = region == "W"
 
 	foreach b of varlist bank10* bank25* bankAll* {
 		ren `b' bank_
-		merge m:1 bank_ cname using `bank_rr', nogen keep(1 3)
+		include "$repo/clean_banknames.do"
+		merge m:1 bankname_stn cname using `bank_rr', nogen keep(1 3)
 		local suffix = substr("`b'", 5, .)
 		ren ???bankers_??? ???bankers_???_`suffix'
 		ren bank_ `b'
+		drop bankname_stn
 	}
 	foreach var of varlist ???bankers_* {
 		replace `var' = 0 if `var' == .
 	}
+	
 	egen ownbankers_num = rowtotal(ownbankers_num_*)
 	egen ownbankers_ind = rowmax(ownbankers_ind_*)
 	egen totbankers_num = rowmax(totbankers_num_*)
@@ -175,17 +194,17 @@ forval ystart = 1895(5)1915 {
 		foreach var of varlist boardseats* {
 			replace `var' = 0 if `var' == .
 		}
-	merge m:1 cname year_std using "assets.dta", nogen keep(1 3)
+	merge m:1 cname year_std using "Data/assets.dta", nogen keep(1 3)
 		gen assets_mn = assets/1000000
 		gen ln_assets = ln(assets)
 		
-	merge m:1 cname using "RR_Financials1890.dta", nogen keep(1 3)
+	merge m:1 cname using "Data/RR_Financials1890.dta", nogen keep(1 3)
 		/*ren receivership receivership_yr
 		gen receivership = receivership_yr < `ystart' & receivership != .*/
 		drop receivership
 		
 	// receivership and L5.receivership
-	include harmonize_rr_names.do
+	include "$repo/harmonize_rr_names.do"
 	replace year_std = year_std - 5
 	merge m:1 cname_stn year_std using `receivership', nogen keep(1 3)
 	ren receivership L5_receivership
@@ -253,7 +272,6 @@ forval ystart = 1895(5)1915 {
 		gen othbankers_sh = othbankers_num/boardsize
 		gen totbankers_sh = totbankers_num/boardsize
 		gen totbankers_sh2 = totbankers_sh^2
-	
 	gen boardseats_samereg_num2 = boardseats_samereg_num^2
 		
 	merge m:1 cname using `rrfin', keep(1 3) nogen
@@ -284,7 +302,7 @@ forval ystart = 1895(5)1915 {
 	egen rrid = group(cname_stn)
 	
 	#delimit ;
-	eststo summ_`ystart'`full': estpost summ joinedboard /*jta rank_1_10 rank_11_25 
+	/*eststo summ_`ystart'`full': estpost summ joinedboard /*jta rank_1_10 rank_11_25 
 						jta_X_rank10 jta_X_rank25*/ regN regS regW
 						boardseats_samereg_ind boardseats_othreg_ind
 						/*jta_X_seats_same*/ ownbankers_ind othbankers_ind
@@ -292,23 +310,27 @@ forval ystart = 1895(5)1915 {
 	eststo summ_cont_`ystart'`full': estpost summ assets_mn /*ltdebt_assets stdebt_assets
 						totdebt_assets margin_safety mat_debt_vol mat_debt_rat*/
 						boardseats_samereg_num boardseats_othreg_num
-						ownbankers_num ownbankers_sh othbankers_num othbankers_sh, d;
-	
+						ownbankers_num ownbankers_sh othbankers_num othbankers_sh, d;*/
+	dis "`ystart'";
 	eststo r1`abc'`full', title("`ystart'-`y5'"):
 		reg joinedboard rank_1_10 receivership L5_receivership boardseats_samereg_num 
 							totbankers_sh boardsize ln_assets, vce(cluster rrid);
+		estadd ysumm, mean;
 	eststo r2`abc'`full', title("`ystart'-`y5'"):
 		reg joinedboard rank_1_10 receivership L5_receivership boardseats_samereg_num 
 							ownbankers_sh othbankers_sh
 							boardsize ln_assets, vce(cluster rrid);
+		estadd ysumm, mean;
 	eststo r3`abc'`full', title("`ystart'-`y5'"):
 		reg joinedboard rank_1_10 receivership L5_receivership boardseats_samereg_num 
 							boardseats_samereg_num2 totbankers_sh
 							boardsize ln_assets, vce(cluster rrid);
+		estadd ysumm, mean;
 	eststo r4`abc'`full', title("`ystart'-`y5'"):
 		reg joinedboard rank_1_10 receivership L5_receivership boardseats_samereg_num 
 							boardseats_samereg_num2 ownbankers_sh othbankers_sh
 							boardsize ln_assets, vce(cluster rrid);
+		estadd ysumm, mean;
 	/*eststo r4`abc'`full', title("`ystart'-`y5'"):
 		reg joinedboard jta rank_1_10 boardseats_samereg_ind ln_assets
 							boardseats_samereg_num ownbankers_sh
@@ -323,9 +345,10 @@ forval ystart = 1895(5)1915 {
 esttab r1? r2? r3? r4? r1?_fullset r2?_fullset r3?_fullset r4?_fullset
 	using "RR-banker_pair_regs.csv", replace
 	star(+ 0.10 * 0.05 ** 0.01 *** 0.001) se mtitles
+	scalars("ymean Mean(Dep. Var.)") addnotes("SEs clustered on RRid")
 	order(rank_1_10 receivership L5_receivership boardseats_samereg_num
 		boardseats_samereg_num2 totbankers_sh ownbankers_sh othbankers_sh boardsize ln_assets);
-
+/*
 esttab summ_1895 summ_1900 summ_1905 summ_1910 summ_1915
 	using "RR-banker_pair_summ.csv", replace
 	cells("count mean(fmt(4))") mtitles("1895" "1900" "1905" "1910" "1915") note(" ")
@@ -351,9 +374,9 @@ esttab summ_cont_1895_fullset summ_cont_1900_fullset
 	cells("count mean(fmt(3)) sd(fmt(3)) min(fmt(2)) max(fmt(2))
 				p10(fmt(2)) p25(fmt(2)) p50(fmt(2)) p75(fmt(2)) p90(fmt(2))")
 	title("RR-Banker Pair Vars (All Bankers): Other");
-
+*/
 #delimit cr
-
+sdf
 *%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 foreach full in "" "_fullset" {
 	use `temp1895`full'', clear
@@ -384,12 +407,14 @@ foreach full in "" "_fullset" {
 			boardseats_samereg_num2 boardseats_samereg_num2_X????
 			totbankers_sh totbankers_sh_X????
 			boardsize* ln_assets* i.rrid, vce(cluster rrid);
+		estadd ysumm, mean;
 	eststo r2`full', title("RR Dummies"):
 		reg joinedboard yr19* rank_1_10* receivership*
 			boardseats_samereg_num boardseats_samereg_num_X????
 			boardseats_samereg_num2 boardseats_samereg_num2_X????
 			ownbankers_sh* othbankers_sh*
 			boardsize* ln_assets* i.rrid, vce(cluster rrid);
+		estadd ysumm, mean;
 	egen pairid = group(cname_stn fullname_m);
 	xtset pairid year_std;
 	eststo r1`full'_fe, title("RR-Banker Pair FEs"):
@@ -397,13 +422,13 @@ foreach full in "" "_fullset" {
 			boardseats_samereg_num boardseats_samereg_num_X????
 			boardseats_samereg_num2 boardseats_samereg_num2_X????
 			totbankers_sh totbankers_sh_X????
-			boardsize* ln_assets*, fe vce(robust);
+			boardsize* ln_assets*, fe vce(cluster rrid);
 	eststo r2`full'_fe, title("RR-Banker Pair FEs"):
 		xtreg joinedboard yr19* rank_1_10* receivership*
 			boardseats_samereg_num boardseats_samereg_num_X????
 			boardseats_samereg_num2 boardseats_samereg_num2_X????
 			ownbankers_sh* othbankers_sh*
-			boardsize* ln_assets*, fe vce(robust);
+			boardsize* ln_assets*, fe vce(cluster rrid);
 	#delimit cr
 }
 
@@ -411,6 +436,7 @@ foreach full in "" "_fullset" {
 esttab r1 r2 r1_fe r2_fe r1_fullset r2_fullset r1_fullset_fe r2_fullset_fe
 	using "RR-banker_pair_regs_timeints.csv", replace
 	star(+ 0.10 * 0.05 ** 0.01 *** 0.001) se mtitles drop(*rrid)
+	scalars("ymean Mean(Dep. Var.)") addnotes("SEs clustered on RRid")
 	order(yr19* rank_1_10* receivership* boardseats_samereg_num
 			boardseats_samereg_num_* boardseats_samereg_num2*
 			totbankers_sh totbankers_sh_*

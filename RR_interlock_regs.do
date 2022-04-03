@@ -4,6 +4,7 @@ RR_interlock_regs.do
 */
 clear all
 cap log close
+set scheme s1color, perm
 pause on
 
 cap cd "C:\Users\lmostrom\Documents\Gilded Age Boards - Scratch\"
@@ -174,9 +175,11 @@ forval y = 1880(5)1920 {
 		ren banker banker_unique
 		ren same_reg same_reg_unique
 			replace same_reg_unique = 0 if interlock_unique == 0
+			gen same_reg_bnkr_unique = (same_reg_unique & banker_unique)
 		gen same_reg_tot = same_reg_unique * interlock_tot
+			gen same_reg_bnkr_tot = same_reg_tot * banker_tot
 		keep if year_std == `y'
-		collapse (sum) interlock_* banker_* same_reg_tot same_reg_unique (max) assetsA, ///
+		collapse (sum) interlock_* banker_* same_reg_*tot same_reg_*unique (max) assetsA, ///
 			by(cnameA year_std)
 		merge 1:1 cnameA year_std using `nd', keep(1 3) nogen
 		replace n_directors = 0 if n_directors == .
@@ -184,6 +187,7 @@ forval y = 1880(5)1920 {
 		
 		eststo rr_summ_`y': estpost summ interlock_tot interlock_unique ///
 							banker_tot banker_unique same_reg_tot same_reg_unique ///
+							same_reg_bnkr_tot same_reg_bnkr_unique ///
 							assetsA n_directors, d
 	restore
 }
@@ -270,33 +274,41 @@ xtset pairid year_std
 
 eststo r1a1, title("Interlocks     JTA Only"):
 				xtreg interlock jta_X_post, vce(cluster pairid) fe;
+		estadd ysumm, mean;
 eststo r1a3, title("Interlocks        Same Reg & JTA"):
 				xtreg interlock
 				same_reg_X_post jta_X_post
 				same_reg_X_jta_X_post, vce(cluster pairid) fe;
+		estadd ysumm, mean;
 eststo r1c1, title("Interlocks     JTA Only      (w/ Controls)"):
 				xtreg interlock jta_X_post
 				ln_sum_assets assets_ratio, vce(cluster pairid) fe;
+		estadd ysumm, mean;
 eststo r1c3, title("Interlocks        Same Reg & JTA         (w/ Controls)"):
 				xtreg interlock
 				same_reg_X_post jta_X_post
 				same_reg_X_jta_X_post
 				ln_sum_assets assets_ratio, vce(cluster pairid) fe;
+		estadd ysumm, mean;
 
 eststo r2a1, title("Bankers     JTA Only"):
 				xtreg banker jta_X_post, vce(cluster pairid) fe;
+		estadd ysumm, mean;
 eststo r2a2, title("Bankers        Same Reg & JTA"):
 				xtreg banker 
 				same_reg_X_post jta_X_post
 				same_reg_X_jta_X_post, vce(cluster pairid) fe;
+		estadd ysumm, mean;
 eststo r2b1, title("Bankers     JTA Only         (w/ Controls)"):
 				xtreg banker jta_X_post
 				ln_sum_assets assets_ratio, vce(cluster pairid) fe;
+		estadd ysumm, mean;
 eststo r2b2, title("Bankers        Same Reg & JTA         (w/ Controls)"):
 				xtreg banker 
 				same_reg_X_post jta_X_post
 				same_reg_X_jta_X_post
 				ln_sum_assets assets_ratio, vce(cluster pairid) fe;
+		estadd ysumm, mean;
 				
 /*eststo r3a1, title("Bankers    JTA Only           Cond. on Int."):
 				xtreg banker jta_X_post if interlock, vce(cluster pairid) fe;
@@ -313,7 +325,8 @@ eststo r3c2, title("Bankers        Same Reg & JTA (w/ Controls)          Cond. o
 				ln_sum_assets assets_ratio if interlock, vce(cluster pairid) fe;*/
 	
 esttab r* using "Thesis/Interlocks/RR_interlock_xtregs.csv", replace
-	star(+ 0.10 * 0.05 ** 0.01 *** 0.001) mtitles se;
+	star(+ 0.10 * 0.05 ** 0.01 *** 0.001) mtitles se
+	 scalars("ymean Mean(Dep. Var.)") addnotes("SEs clustered on pairid");
 
 
 est clear;
@@ -331,30 +344,36 @@ forval yr = 1890(5)1920 {;
 				reg interlock jta same_reg same_reg_X_jta
 					ln_sum_assets assets_ratio
 					if year_std == `yr', vce(robust);
+		estadd ysumm, mean;
 					
 	eststo r2`abc', title("Banker          `yr'"):
 				reg banker jta same_reg same_reg_X_jta
 					ln_sum_assets assets_ratio
 					if year_std == `yr', vce(robust);
+		estadd ysumm, mean;
 	
 	eststo s1`abc', title("Interlock       `yr'"):
 				reg interlock same_reg ln_sum_assets assets_ratio
 					if year_std == `yr', vce(robust);
+		estadd ysumm, mean;
 					
 	eststo s2`abc', title("Banker          `yr'"):
 				reg banker same_reg ln_sum_assets assets_ratio
 					if year_std == `yr', vce(robust);
+		estadd ysumm, mean;
 	/*eststo s3`abc', title("Banker | Interlock          `yr'"):
 				reg banker same_reg ln_sum_assets assets_ratio
 					if year_std == `yr' & interlock, vce(cluster pairid);*/
 };
 
 esttab r1* r2* using "Thesis/Interlocks/RR_interlock_regs.csv", replace
-	star(+ 0.10 * 0.05 ** 0.01 *** 0.001) se mtitles
-	order(jta same_reg same_reg_X_jta ln_sum_assets assets_ratio);
+	star(+ 0.10 * 0.05 ** 0.01 *** 0.001) se mtitles scalars("ymean Mean(Dep. Var.)")
+	order(jta same_reg same_reg_X_jta ln_sum_assets assets_ratio)
+	addnotes("Robust SEs");
 esttab s1* s2* /*s3**/ using "Thesis/Interlocks/RR_simplified_interlock_regs.csv", replace
-	star(+ 0.10 * 0.05 ** 0.01 *** 0.001) se mtitles
-	order(same_reg ln_sum_assets assets_ratio);
+	star(+ 0.10 * 0.05 ** 0.01 *** 0.001) se mtitles scalars("ymean Mean(Dep. Var.)")
+	order(same_reg ln_sum_assets assets_ratio)
+	addnotes("Robust SEs");
 				
 
 #delimit cr
@@ -453,7 +472,7 @@ esttab assets_intnotbnk???? using "Thesis/Interlocks/RR_interlock_summs.csv", ap
 	
 	*/
 #delimit cr
-	sdf
+sdf
 *%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 	
 foreach y in 1880 1885 1895 1900 1905 1910 1915 1920 {
@@ -468,8 +487,8 @@ drop same_reg_X_post jta_X_post same_reg_X_jta_X_post
 cap mkdir "Thesis/Interlocks/Interaction Term Plots/"
 cd "Thesis/Interlocks/Interaction Term Plots/"
 
-foreach yvar in "interlock" /*"banker"*/ {
-forval jta_only = 0/1 {
+foreach yvar in /*"interlock"*/ "banker" {
+forval jta_only = 1/1 {
 	local Yvar = proper("`yvar'") + "s"
 	/*if "`yvar'" == "interlock" {*/
 	if `jta_only' == 0 {
@@ -573,8 +592,7 @@ foreach wc in /*""*/ "_wCont" {
 		#delimit ;
 		if `jta_only' == 0 xtreg `yvar' y???? same_reg_X_???? jta_X_????
 			same_reg_X_jta_X_???? `controls', fe vce(cluster pairid);
-		if `jta_only' == 0 xtreg `yvar' y???? same_reg_X_???? jta_X_????
-			same_reg_X_jta_X_???? `controls', fe vce(cluster pairid);
+		if `jta_only' == 1 xtreg `yvar' y???? jta_X_???? `controls', fe vce(cluster pairid);
 		
 		mat M`jta_only' = r(table)["b", "jta_X_1880".."jta_X_1920"]
 					\ r(table)["ll".."ul", "jta_X_1880".."jta_X_1920"];
@@ -585,7 +603,7 @@ foreach wc in /*""*/ "_wCont" {
 	
 	preserve
 		drop *
-		svmat2 M, n(col) r(coeff)
+		svmat2 M`jta_only', n(col) r(coeff)
 		
 		foreach var of local stemlist {
 		    gen `var'1890 = 0
@@ -593,6 +611,8 @@ foreach wc in /*""*/ "_wCont" {
 		
 		reshape long `stemlist', i(coeff) j(year_std)
 		reshape wide `stemlist', i(year_std) j(coeff) string
+	
+		export delimited "banker_regs_coeffs_plot_input.csv", replace
 		
 		foreach stem of local stemlist {
 		    #delimit ;
@@ -649,7 +669,7 @@ foreach wc in /*""*/ "_wCont" {
 		restore
 	}
 		*/
-}
+
 } // jta_only loop
 } // interlock/banker loop
 
