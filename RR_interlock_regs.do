@@ -9,7 +9,8 @@ pause on
 
 cap cd "C:\Users\lmostrom\Documents\Gilded Age Boards - Scratch\"
 cap cd "C:\Users\17036\Dropbox\Personal Document Backup\Gilded Age Boards - Scratch\"
-global repo "C:/Users/17036/OneDrive/Documents/GitHub/gilded_age_boards"
+cap cd "/Users/laurenmostrom/Dropbox/Personal Document Backup/Gilded Age Boards - Scratch/"
+global repo "/Users/laurenmostrom/Documents/GitHub/gilded_age_boards"
 
 *%% Prep Number of Directors Variable %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -272,6 +273,10 @@ xtset pairid year_std
 
 #delimit ;
 
+eststo r1a0, title("Interlocks     No JTA"):
+				xtreg interlock same_reg
+				ln_sum_assets assets_ratio, vce(cluster pairid);
+		estadd ysumm, mean;
 eststo r1a1, title("Interlocks     JTA Only"):
 				xtreg interlock jta_X_post, vce(cluster pairid) fe;
 		estadd ysumm, mean;
@@ -291,6 +296,10 @@ eststo r1c3, title("Interlocks        Same Reg & JTA         (w/ Controls)"):
 				ln_sum_assets assets_ratio, vce(cluster pairid) fe;
 		estadd ysumm, mean;
 
+eststo r2a0, title("Bankers     No JTA"):
+				xtreg banker same_reg
+				ln_sum_assets assets_ratio, vce(cluster pairid);
+		estadd ysumm, mean;
 eststo r2a1, title("Bankers     JTA Only"):
 				xtreg banker jta_X_post, vce(cluster pairid) fe;
 		estadd ysumm, mean;
@@ -330,14 +339,34 @@ esttab r* using "Thesis/Interlocks/RR_interlock_xtregs.csv", replace
 
 
 est clear;
+
+
+	eststo r1a, title("Interlock       All Years"):
+				reg interlock jta same_reg same_reg_X_jta
+					ln_sum_assets assets_ratio, vce(robust);
+		estadd ysumm, mean;
+					
+	eststo r2a, title("Banker          All Years"):
+				reg banker jta same_reg same_reg_X_jta
+					ln_sum_assets assets_ratio, vce(robust);
+		estadd ysumm, mean;
+	
+	eststo s1a, title("Interlock      All Years"):
+				reg interlock same_reg ln_sum_assets assets_ratio, vce(robust);
+		estadd ysumm, mean;
+					
+	eststo s2a, title("Banker          All Years"):
+				reg banker same_reg ln_sum_assets assets_ratio, vce(robust);
+		estadd ysumm, mean;
+
 forval yr = 1890(5)1920 {;
-	if `yr' == 1890 local abc "a";
-	if `yr' == 1895 local abc "b";
-	if `yr' == 1900 local abc "c";
-	if `yr' == 1905 local abc "d";
-	if `yr' == 1910 local abc "e";
-	if `yr' == 1915 local abc "f";
-	if `yr' == 1920 local abc "g";
+	if `yr' == 1890 local abc "b";
+	if `yr' == 1895 local abc "c";
+	if `yr' == 1900 local abc "d";
+	if `yr' == 1905 local abc "e";
+	if `yr' == 1910 local abc "f";
+	if `yr' == 1915 local abc "g";
+	if `yr' == 1920 local abc "h";
 	
 	
 	eststo r1`abc', title("Interlock       `yr'"):

@@ -9,6 +9,7 @@ pause on
 
 cap cd "C:\Users\lmostrom\Documents\PersonalResearch\"
 cap cd "C:/Users/17036/Dropbox/Personal Document Backup/Gilded Age Boards - Scratch"
+cap cd "/Users/laurenmostrom/Dropbox/Personal Document Backup/Gilded Age Boards - Scratch/"
 global repo "C:/Users/17036/OneDrive/Documents/GitHub/gilded_age_boards"
 
 use fullname_m cname year_std director using "Thesis/Merges/Ind_boards_wtitles.dta", clear

@@ -12,6 +12,7 @@ pause on
 
 cap cd "C:/Users/lmostrom/Documents/Gilded Age Boards - Scratch"
 cap cd "C:/Users/17036/Dropbox/Personal Document Backup/Gilded Age Boards - Scratch"
+cap cd "/Users/laurenmostrom/Dropbox/Personal Document Backup/Gilded Age Boards - Scratch/"
 global repo "C:/Users/17036/OneDrive/Documents/GitHub/gilded_age_boards"
 
 *%%Prep Underwriter Dataset%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
