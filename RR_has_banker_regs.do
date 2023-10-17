@@ -67,36 +67,12 @@ include "$repo/assign_regions.do"
 
 gen north = region == "N"
 gen west = region == "W"
+encode region, gen(regioncode)
 
 bys cname_stn: egen entry_yr = min(year_std)
 gen entrant = entry_yr == year_std
 gen hastop10_X_entrant = has_top10uw * entrant
 
-*** Banker Regressions
-est clear
-#delimit ;
-
-eststo m1, title("Top 10 UW"):
-	reg has_top10uw ln_assets boardsize, vce(robust);
-		estadd ysumm, mean;
-
-eststo m2, title("Top 10 UW + Entry Yr Dummies"):
-	reg has_top10uw ln_assets boardsize i.entry_yr, vce(robust);
-		estadd ysumm, mean;
-
-eststo m3, title("Top 10 UW + Region Dummies "):
-	reg has_top10uw ln_assets boardsize north west, vce(robust);
-		estadd ysumm, mean;
-
-eststo m4, title("Top 10 UW + Year Dummies"):
-	reg has_top10uw ln_assets boardsize i.year_std, vce(robust);
-		estadd ysumm, mean;
-		
-
-esttab m* using "Thesis/Interlocks/RR_banker_regs.csv", replace
-	star(+ 0.10 * 0.05 ** 0.01 *** 0.001) se mtitles scalars("ymean Mean(Dep. Var.)")
-	addnotes("Robust SEs");
-#delimit cr
 
 
 *** Growth Regressions
@@ -108,26 +84,61 @@ est clear
 #delimit ;
 
 eststo m1, title("dln Assets (F5)"):
-	reg f5_dln_assets has_top10uw, vce(robust);
+	reghdfe f5_dln_assets has_top10uw,
+						a(year_std regioncode) vce(robust);
 		estadd ysumm, mean;
 
 eststo m2, title("dln Assets (F5)"):
-	reg f5_dln_assets has_top10uw entrant hastop10_X_entrant, vce(robust);
+	reghdfe f5_dln_assets has_top10uw entrant hastop10_X_entrant,
+						a(year_std regioncode) vce(robust);
 		estadd ysumm, mean;
 
 eststo m3, title("dln Assets (F5)"):
-	reg f5_dln_assets has_top10uw entrant hastop10_X_entrant ln_assets, vce(robust);
-		estadd ysumm, mean;
-
-eststo m3, title("dln Assets (F5)"):
-	reg f5_dln_assets has_top10uw entrant hastop10_X_entrant north west, vce(robust);
+	reghdfe f5_dln_assets has_top10uw entrant hastop10_X_entrant ln_assets,
+						a(year_std regioncode) vce(robust);
 		estadd ysumm, mean;
 		
 
 esttab m* using "Thesis/Interlocks/RR_growth_regs.csv", replace
 	star(+ 0.10 * 0.05 ** 0.01 *** 0.001) se mtitles scalars("ymean Mean(Dep. Var.)")
-	addnotes("Robust SEs");
+	addnotes("Robust SEs and Year and Region FEs");
 #delimit cr
 
 
+*** Banker Regressions
+
+use "Data/RR_bankers_1890-1910.dta", clear
+
+gen tobinsq = (marketcap + (totassets - comstock - surplus))/totassets
+gen bvlev = totdebt/totassets
+gen ln_assets = ln(totassets)
+gen receivership10 = (receivership != .)
+replace added_banker = (n_top10uw1910 > n_top10uw1890)
+
+est clear
+#delimit ;
+
+eststo m1, title("Had Banker 1890"):
+	reghdfe has_top10uw1890 ln_assets bvlev tobinsq receivership10, a(cohort) vce(robust);
+		estadd ysumm, mean;
+
+eststo m2, title("Had Banker 1910"):
+	reghdfe has_top10uw1910 ln_assets bvlev tobinsq receivership10, a(cohort) vce(robust);
+		estadd ysumm, mean;
+
+eststo m3, title("Added Banker (All RRs)"):
+	reghdfe added_banker ln_assets bvlev tobinsq receivership10, a(cohort) vce(robust);
+		estadd ysumm, mean;
+
+eststo m4, title("Added Banker (No Banker 1890)"):
+	reghdfe added_banker ln_assets bvlev tobinsq receivership10
+				if has_top10uw1890 == 0, a(cohort) vce(robust);
+		estadd ysumm, mean;
+		
+
+esttab m* using "Thesis/Interlocks/RR_banker_regs.csv", replace
+	star(+ 0.10 * 0.05 ** 0.01 *** 0.001) se mtitles
+	scalars("N Obs. r2 R-Sq. ymean Mean(Dep. Var.)")
+	addnotes("Robust SEs and Cohort FEs");
+#delimit cr
 

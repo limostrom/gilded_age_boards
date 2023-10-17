@@ -129,19 +129,19 @@ est clear
 #delimit ;
 
 eststo m1, title("Top 10 UW"):
-	reg has_top10uw ln_assets boardsize, vce(robust);
+	reg has_top10uw ln_assets, vce(robust);
 		estadd ysumm, mean;
 
 eststo m2, title("Top 10 UW + Entry Yr Dummies"):
-	reg has_top10uw ln_assets boardsize i.entry_yr, vce(robust);
+	reg has_top10uw ln_assets i.entry_yr, vce(robust);
 		estadd ysumm, mean;
 
 eststo m3, title("Top 10 UW + Industry Dummies "):
-	reg has_top10uw ln_assets boardsize i.industry_code, vce(robust);
+	reg has_top10uw ln_assets i.industry_code, vce(robust);
 		estadd ysumm, mean;
 
 eststo m4, title("Top 10 UW + Year Dummies"):
-	reg has_top10uw ln_assets boardsize i.year_std, vce(robust);
+	reg has_top10uw ln_assets i.year_std, vce(robust);
 		estadd ysumm, mean;
 		
 
@@ -162,25 +162,25 @@ est clear
 #delimit ;
 
 eststo m1, title("dln Assets (F5)"):
-	reg f5_dln_assets has_top10uw, vce(robust);
+	reghdfe f5_dln_assets has_top10uw,
+						a(industry_code year_std) vce(robust);
 		estadd ysumm, mean;
 
 eststo m2, title("dln Assets (F5)"):
-	reg f5_dln_assets has_top10uw entrant hastop10_X_entrant, vce(robust);
+	reghdfe f5_dln_assets has_top10uw entrant hastop10_X_entrant, 
+						a(industry_code year_std) vce(robust);
 		estadd ysumm, mean;
 
 eststo m3, title("dln Assets (F5)"):
-	reg f5_dln_assets has_top10uw entrant hastop10_X_entrant ln_assets, vce(robust);
+	reghdfe f5_dln_assets has_top10uw entrant hastop10_X_entrant ln_assets,
+						a(industry_code year_std) vce(robust);
 		estadd ysumm, mean;
 
-eststo m3, title("dln Assets (F5)"):
-	reg f5_dln_assets has_top10uw entrant hastop10_X_entrant i.industry_code, vce(robust);
-		estadd ysumm, mean;
 		
 
 esttab m* using "Thesis/Interlocks/Ind_growth_regs.csv", replace label
 	star(+ 0.10 * 0.05 ** 0.01 *** 0.001) se mtitles scalars("ymean Mean(Dep. Var.)")
-	addnotes("Robust SEs");
+	addnotes("Robust SEs and Year and Industry FEs");
 #delimit cr
 
 
