@@ -125,23 +125,30 @@ gen ln_assets = ln(assets)
 
 
 *** Banker Regressions
+
+gen cohort = int(entry_yr/10)*10
+
 est clear
 #delimit ;
 
-eststo m1, title("Top 10 UW"):
-	reg has_top10uw ln_assets, vce(robust);
+eststo m1, title("Had Banker 1900"):
+	reghdfe has_top10uw ln_assets if year_std == 1900, a(cohort) vce(robust);
 		estadd ysumm, mean;
 
-eststo m2, title("Top 10 UW + Entry Yr Dummies"):
-	reg has_top10uw ln_assets i.entry_yr, vce(robust);
+eststo m2, title("Had Banker 1905"):
+	reghdfe has_top10uw ln_assets if year_std == 1905, a(cohort) vce(robust);
 		estadd ysumm, mean;
 
-eststo m3, title("Top 10 UW + Industry Dummies "):
-	reg has_top10uw ln_assets i.industry_code, vce(robust);
+eststo m3, title("Had Banker 1910"):
+	reghdfe has_top10uw ln_assets if year_std == 1910, a(cohort) vce(robust);
 		estadd ysumm, mean;
-
-eststo m4, title("Top 10 UW + Year Dummies"):
-	reg has_top10uw ln_assets i.year_std, vce(robust);
+		
+eststo m4, title("Had Banker 1915"):
+	reghdfe has_top10uw ln_assets if year_std == 1915, a(cohort) vce(robust);
+		estadd ysumm, mean;
+		
+eststo m5, title("Had Banker 1920"):
+	reghdfe has_top10uw ln_assets if year_std == 1920, a(cohort) vce(robust);
 		estadd ysumm, mean;
 		
 

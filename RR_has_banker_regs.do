@@ -73,7 +73,7 @@ bys cname_stn: egen entry_yr = min(year_std)
 gen entrant = entry_yr == year_std
 gen hastop10_X_entrant = has_top10uw * entrant
 
-
+gen cohort = int(entry_yr/10)*10
 
 *** Growth Regressions
 xtset id year_std
@@ -107,6 +107,35 @@ esttab m* using "Thesis/Interlocks/RR_growth_regs.csv", replace
 
 *** Banker Regressions
 
+est clear
+#delimit ;
+
+eststo m1, title("Had Banker 1890"):
+	reghdfe has_top10uw ln_assets if year_std == 1890, a(cohort) vce(robust);
+		estadd ysumm, mean;
+
+eststo m2, title("Had Banker 1900"):
+	reghdfe has_top10uw ln_assets if year_std == 1900, a(cohort) vce(robust);
+		estadd ysumm, mean;
+		
+eststo m3, title("Had Banker 1905"):
+	reghdfe has_top10uw ln_assets if year_std == 1905, a(cohort) vce(robust);
+		estadd ysumm, mean;
+		
+eststo m4, title("Had Banker 1910"):
+	reghdfe has_top10uw ln_assets if year_std == 1910, a(cohort) vce(robust);
+		estadd ysumm, mean;
+		
+eststo m5, title("Had Banker 1915"):
+	reghdfe has_top10uw ln_assets if year_std == 1915, a(cohort) vce(robust);
+		estadd ysumm, mean;
+
+eststo m6, title("Had Banker 1920"):
+	reghdfe has_top10uw ln_assets if year_std == 1920, a(cohort) vce(robust);
+		estadd ysumm, mean;
+
+#delimit cr
+
 use "Data/RR_bankers_1890-1910.dta", clear
 
 gen tobinsq = (marketcap + (totassets - comstock - surplus))/totassets
@@ -115,22 +144,14 @@ gen ln_assets = ln(totassets)
 gen receivership10 = (receivership != .)
 replace added_banker = (n_top10uw1910 > n_top10uw1890)
 
-est clear
+
 #delimit ;
 
-eststo m1, title("Had Banker 1890"):
-	reghdfe has_top10uw1890 ln_assets bvlev tobinsq receivership10, a(cohort) vce(robust);
-		estadd ysumm, mean;
-
-eststo m2, title("Had Banker 1910"):
-	reghdfe has_top10uw1910 ln_assets bvlev tobinsq receivership10, a(cohort) vce(robust);
-		estadd ysumm, mean;
-
-eststo m3, title("Added Banker (All RRs)"):
+eststo m7, title("Added Banker (All RRs)"):
 	reghdfe added_banker ln_assets bvlev tobinsq receivership10, a(cohort) vce(robust);
 		estadd ysumm, mean;
 
-eststo m4, title("Added Banker (No Banker 1890)"):
+eststo m8, title("Added Banker (No Banker 1890)"):
 	reghdfe added_banker ln_assets bvlev tobinsq receivership10
 				if has_top10uw1890 == 0, a(cohort) vce(robust);
 		estadd ysumm, mean;
@@ -138,7 +159,7 @@ eststo m4, title("Added Banker (No Banker 1890)"):
 
 esttab m* using "Thesis/Interlocks/RR_banker_regs.csv", replace
 	star(+ 0.10 * 0.05 ** 0.01 *** 0.001) se mtitles
-	scalars("N Obs. r2 R-Sq. ymean Mean(Dep. Var.)")
+	scalars("N Obs. r2 R Sq. ymean Mean(Dep. Var.)")
 	addnotes("Robust SEs and Cohort FEs");
 #delimit cr
 
